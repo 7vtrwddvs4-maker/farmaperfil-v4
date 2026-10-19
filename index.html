@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>FarmaPerfil v4.0</title>
 
     <!-- Íconos de Google -->
@@ -14,6 +14,21 @@
 
     <!-- Alertas de SweetAlert2 (Para el Módulo de Despacho) -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <!-- ==========================================================================
+         CONFIGURACIÓN DEL ICONO (FAVICON Y APP MÓVIL)
+         ========================================================================== -->
+    <!-- Icono estándar para pestañas del navegador -->
+    <link rel="icon" type="image/png" href="icono.png">
+    
+    <!-- Icono de alta resolución para dispositivos Apple (añadir a pantalla de inicio) -->
+    <link rel="apple-touch-icon" href="icono.png">
+    
+    <!-- Meta etiquetas para que se comporte como una App nativa en móviles -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="FarmaPerfil v4">
 </head>
 
 <body>
