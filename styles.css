@@ -692,3 +692,89 @@ body.light-theme .input-pill select {
   body.impresion-alta .patient-grid, body.impresion-alta table.med-grid { margin-bottom: 4px !important; }
   body.impresion-alta .main-content { padding-top: 5mm !important; padding-bottom: 0 !important; }
 }
+
+/* =========================================================
+   FILAS DEL MODAL DE CONCILIACIÓN ACTIVA
+   ========================================================= */
+.item-conciliacion {
+    display: grid;
+    grid-template-columns: 2.2fr 0.8fr 0.9fr 1.2fr;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--glass-border);
+    transition: all 0.2s ease;
+}
+
+.item-conciliacion.estado-omitido {
+    background: rgba(255, 82, 82, 0.08);
+    border-color: rgba(255, 82, 82, 0.35);
+    opacity: 0.65;
+}
+
+.item-conciliacion.estado-omitido .med-nombre-concil {
+    text-decoration: line-through;
+    color: var(--text-muted);
+}
+
+.med-nombre-concil {
+    font-weight: 800;
+    font-size: 13.5px;
+    color: var(--text-main);
+}
+
+.med-esquema-concil {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.badge-ayer-concil {
+    text-align: center;
+    font-weight: 800;
+    font-size: 13px;
+    color: var(--text-muted);
+    background: rgba(0, 0, 0, 0.25);
+    padding: 6px 0;
+    border-radius: 8px;
+}
+
+.input-hoy-concil {
+    width: 100%;
+    text-align: center;
+    font-weight: 900;
+    font-size: 15px;
+    padding: 6px 4px;
+    border-radius: 8px;
+    border: 2px solid var(--accent-green);
+    background: rgba(0, 0, 0, 0.35);
+    color: var(--text-main);
+    outline: none;
+}
+
+.input-hoy-concil:disabled {
+    border-color: transparent;
+    color: var(--text-muted);
+    background: rgba(0, 0, 0, 0.15);
+}
+
+.btn-toggle-estado-concil {
+    padding: 7px 10px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+    border: 1px solid rgba(255, 82, 82, 0.4);
+    background: rgba(255, 82, 82, 0.15);
+    color: #ff5252;
+    transition: 0.2s;
+    text-transform: uppercase;
+}
+
+.btn-toggle-estado-concil.modo-reactivar {
+    border-color: rgba(0, 230, 118, 0.4);
+    background: rgba(0, 230, 118, 0.15);
+    color: var(--accent-green);
+}

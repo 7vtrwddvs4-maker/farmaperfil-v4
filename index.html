@@ -749,6 +749,48 @@
     </div>
   </div>
 
+  <!-- ================================================================= -->
+  <!-- 8. MODAL DE CONCILIACIÓN ACTIVA (VALIDACIÓN DE ARRASTRE)          -->
+  <!-- ================================================================= -->
+  <div id="modal-conciliacion" class="modal-overlay" style="z-index: 9999999; display: none;">
+    <div class="modal-container" style="width: 680px; max-height: 88vh; display: flex; flex-direction: column;">
+      
+      <div class="modal-header" style="flex-direction: column; justify-content: center; text-align: center; gap: 6px;">
+        <span class="material-icons-round icon" style="color: var(--accent-green); font-size: 44px; background: rgba(0,230,118,0.1); padding: 12px; border-radius: 50%;">fact_check</span>
+        <div>
+          <div style="font-size: 20px; font-weight: 800; color: var(--text-main); text-transform: uppercase;">
+            VALIDACIÓN DE TRATAMIENTO DIARIO
+          </div>
+          <div id="subtitulo-conciliacion" style="color: var(--text-muted); font-size: 13px; margin-top: 3px;">
+            Confirme las unidades a despachar hoy, modifique la cantidad o marque sin indicación.
+          </div>
+        </div>
+      </div>
+
+      <!-- Cabecera de columnas -->
+      <div style="display: grid; grid-template-columns: 2.2fr 0.8fr 0.9fr 1.2fr; gap: 10px; padding: 10px 15px; font-size: 11px; font-weight: 800; color: var(--accent-blue); text-transform: uppercase; border-bottom: 1px solid var(--glass-border); margin-top: 10px;">
+        <span>Fármaco / Esquema</span>
+        <span style="text-align: center;">Ayer</span>
+        <span style="text-align: center;">Hoy</span>
+        <span style="text-align: center;">Estado Hoy</span>
+      </div>
+
+      <!-- Contenedor dinámico de filas -->
+      <div id="lista-farmacos-conciliacion" style="flex: 1; overflow-y: auto; max-height: 420px; padding: 8px 10px; display: flex; flex-direction: column; gap: 8px;">
+      </div>
+
+      <!-- Botones de acción -->
+      <div class="modal-actions" style="margin-top: 18px; justify-content: space-between; gap: 15px;">
+        <button type="button" class="btn-entendido" style="flex: 1;" onclick="cerrarModalConciliacion()">CANCELAR</button>
+        <button type="button" class="btn-validar" style="flex: 1.5; background: linear-gradient(135deg, #00e676, #00c853); color: #000; font-weight: 900;" onclick="confirmarConciliacionDia()">
+          <span class="material-icons-round" style="vertical-align: middle; font-size: 18px; margin-right: 4px;">done_all</span>
+          CONFIRMAR Y TRASPASAR AL DÍA
+        </button>
+      </div>
+
+    </div>
+  </div>ƒ
+
     <!-- Conexión a Firebase (Módulos oficiales de Google) -->
     <script type="module">
         // Importamos las herramientas de Firebase desde internet

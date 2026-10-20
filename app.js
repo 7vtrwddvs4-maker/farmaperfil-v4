@@ -1411,106 +1411,350 @@ window.guardarSaldosParaManana = function() {
 };
 
 // ============================================================================
-// 7. AUTOMATIZACIÓN DE NUEVO DÍA (BOTÓN ▶)
+// 7. AUTOMATIZACIÓN DE NUEVO DÍA + MODAL DE CONCILIACIÓN ACTIVA (BOTÓN ▶)
 // ============================================================================
+window.columnaConciliacionDestino = null;
+
 window.iniciarNuevoDiaWeb = function(colIndex) {
+    if (window.isModoHistorico) return;
+
     const headersFecha = document.querySelectorAll(".header-fecha");
     const inputHeader = headersFecha[colIndex];
     if (!inputHeader) return;
 
+    const hoy = new Date();
+    const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+    const fechaFormateada = `${hoy.getDate()}-${meses[hoy.getMonth()]}`;
+
+    // ========================================================================
+    // CASO A: PRIMERA COLUMNA (ÍNDICE 0) -> LÍNEA BASE DIRECTA SIN MODAL
+    // ========================================================================
+    if (colIndex === 0) {
+        inputHeader.value = fechaFormateada;
+        window.actualizarSaldosYSidebar();
+        window.escanearRestringidos();
+        window.programarAutoguardado();
+
+        inputHeader.style.background = "var(--accent-green)";
+        inputHeader.style.color = "#000";
+        setTimeout(() => {
+            inputHeader.style.background = "transparent";
+            inputHeader.style.color = "var(--accent-blue)";
+        }, 800);
+        return;
+    }
+
+    // ========================================================================
+    // CASO B: COLUMNAS 1 A 9 (DÍA 2 EN ADELANTE) -> ABRIR CONCILIACIÓN ACTIVA
+    // ========================================================================
+    window.columnaConciliacionDestino = colIndex;
+    window.abrirModalConciliacionDia(colIndex, fechaFormateada);
+};
+
+window.abrirModalConciliacionDia = function(colIndex, fechaFormateada) {
+    const modal = document.getElementById("modal-conciliacion");
+    const contenedorLista = document.getElementById("lista-farmacos-conciliacion");
+    const subtitulo = document.getElementById("subtitulo-conciliacion");
+    if (!modal || !contenedorLista) return;
+
+    contenedorLista.innerHTML = "";
+    if (subtitulo) {
+        subtitulo.innerHTML = `Validando paso a <b>Día ${colIndex + 1} (${fechaFormateada})</b> · Revise dosis, modifique o marque sin indicación.`;
+    }
+
+    const filas = document.querySelectorAll("#grillaFila tr");
+    const diasADespachar = parseInt(document.getElementById("inputDias")?.value) || 1;
+    const servicioActual = (document.getElementById("servicio")?.value || "").toLowerCase();
+    const esUciUti = servicioActual === "uci" || servicioActual === "uti";
+
+    const diccEspeciales = [
+        "heparina", "salbutamol", "ipratropio", "brexotide", "budesonida", "fluticasona",
+        "formoterol", "tiotropio", "olodaterol", "nph", "glargina", "cristalina",
+        "diben", "fresubin", "survimed", "jevity", "osmolite", "smofkabiven", "smoflipid",
+        "glucerna", "sodio cloruro", "nacl", "glucosa", "glucosalino", "ringer",
+        "sodio bicarbonato 2/3 molar 250 ml", "cloramfenicol", "lagrima", "lágrima",
+        "pilocarpina", "proparacaina", "proparacaína", "dorzolamida", "latanoprost", "tobramicina"
+    ];
+
+    let totalFarmacosEnGrilla = 0;
+
+    filas.forEach(fila => {
+        const inputs = fila.querySelectorAll("input");
+        const medRaw = inputs[0].value.trim();
+        if (!medRaw) return;
+
+        totalFarmacosEnGrilla++;
+        const rowId = fila.dataset.row;
+        const nombreMed = medRaw.toLowerCase();
+        const viaTexto = inputs[1].value.trim();
+        const dosisTexto = inputs[2].value.trim();
+        const posoTexto = inputs[3].value.trim();
+        const posoLower = posoTexto.toLowerCase();
+
+        const inputAyer = inputs[5 + colIndex - 1];
+        const valorAyer = inputAyer ? inputAyer.value.replace("✓", "").trim() : "";
+
+        // Determinar sugerencia inteligente para HOY y motivo clínico
+        let sugerenciaHoy = "";
+        let notaClinica = "";
+        let iniciarOmitido = false;
+
+        const es48h = posoLower.includes("48h");
+        const es72h = posoLower.includes("72h");
+        const esCarga = posoLower === "carga";
+        const medLimpio = window.quitarTildes(nombreMed);
+        const esPomada = dosisTexto.toLowerCase().includes("aplicar") ||
+            ["nistatina 10", "mometasona", "clotrimazol", "mupirocina", "hidrocortisona 1%", "crema", "pomada", "unguento"].some(s => medLimpio.includes(window.quitarTildes(s))) ||
+            viaTexto.toLowerCase() === "top";
+
+        const isJarabe = Object.keys(DB_LIQUIDOS).some(k => medLimpio.includes(window.quitarTildes(k.toLowerCase())));
+        const esEspecial = diccEspeciales.some(m => nombreMed.includes(m)) || isJarabe;
+
+        // 1. Verificar Albúmina > 3 días en UPC
+        const esAlbumina = nombreMed.includes("albumina") || nombreMed.includes("albúmina");
+        if (esAlbumina && esUciUti) {
+            let diasConAlbumina = 0;
+            for (let d = 0; d < colIndex; d++) {
+                if (inputs[5 + d].value.trim() !== "") diasConAlbumina++;
+            }
+            const firmaAlbumina = `${rowId}|${nombreMed}`;
+            const estadoAlm = window.medicamentosPendientes[firmaAlbumina]?.estado;
+            if (diasConAlbumina >= 3 && estadoAlm !== "ACEPTADO") {
+                sugerenciaHoy = "";
+                iniciarOmitido = true;
+                notaClinica = "⚠️ Límite UPC 3 días (Requiere extensión)";
+            }
+        }
+
+        // 2. Reglas según tipo de medicamento si no fue bloqueado por Albúmina
+        if (!notaClinica) {
+            if (esCarga) {
+                sugerenciaHoy = "";
+                iniciarOmitido = true;
+                notaClinica = "Dosis única de carga";
+            } else if (esPomada) {
+                sugerenciaHoy = "";
+                iniciarOmitido = true;
+                notaClinica = "Tópico / Pomada (según requerimiento)";
+            } else if (es48h || es72h) {
+                let diasDesdeUltimaDosis = 0;
+                let ultimaDosisValor = "";
+                for (let i = colIndex - 1; i >= 0; i--) {
+                    let val = inputs[5 + i].value.replace("✓", "").trim();
+                    diasDesdeUltimaDosis++;
+                    let num = parseFloat(val);
+                    if (val !== "" && !isNaN(num) && num > 0) {
+                        ultimaDosisValor = val;
+                        break;
+                    }
+                }
+                if (es48h && diasDesdeUltimaDosis === 2 && ultimaDosisValor !== "") {
+                    sugerenciaHoy = ultimaDosisValor;
+                    notaClinica = "Corresponde hoy (c/48h)";
+                } else if (es72h && diasDesdeUltimaDosis === 3 && ultimaDosisValor !== "") {
+                    sugerenciaHoy = ultimaDosisValor;
+                    notaClinica = "Corresponde hoy (c/72h)";
+                } else {
+                    sugerenciaHoy = "";
+                    iniciarOmitido = true;
+                    notaClinica = `No corresponde hoy (${posoTexto})`;
+                }
+            } else if (esEspecial) {
+                // Para multidosis/sueros/jarabes: usar valor de ayer o cálculo base (o "AUTO" para que calcule el saldo exacto)
+                sugerenciaHoy = valorAyer !== "" ? valorAyer : (window.calcularDosisFila(medRaw, viaTexto, dosisTexto, posoTexto, diasADespachar, rowId) || "T");
+                notaClinica = "Multidosis / Control de saldo automático";
+            } else {
+                // Medicamento estándar diario
+                if (valorAyer !== "") {
+                    sugerenciaHoy = valorAyer;
+                } else {
+                    // Si ayer estuvo en blanco, sugerimos el cálculo pero lo dejamos marcado como omitido por precaución
+                    sugerenciaHoy = window.calcularDosisFila(medRaw, viaTexto, dosisTexto, posoTexto, diasADespachar, rowId);
+                    iniciarOmitido = true;
+                    notaClinica = "Sin despacho ayer";
+                }
+            }
+        }
+
+        // Construir tarjeta de la fila en el modal
+        const item = document.createElement("div");
+        item.className = "item-conciliacion" + (iniciarOmitido ? " estado-omitido" : "");
+        item.dataset.rowId = rowId;
+        item.dataset.esEspecial = esEspecial ? "true" : "false";
+        item.dataset.sugerenciaOriginal = sugerenciaHoy;
+
+        const esquemaStr = [viaTexto, dosisTexto, posoTexto].filter(Boolean).join(" · ");
+
+        item.innerHTML = `
+            <div>
+                <div class="med-nombre-concil">${medRaw}</div>
+                <div class="med-esquema-concil">${esquemaStr || "Sin posología completa"} ${notaClinica ? `<span style="color:var(--accent-blue); font-weight:700;">(${notaClinica})</span>` : ""}</div>
+            </div>
+            <div class="badge-ayer-concil" title="Unidades registradas en el día anterior">
+                ${valorAyer !== "" ? valorAyer : "—"}
+            </div>
+            <div>
+                <input type="text" class="input-hoy-concil" value="${iniciarOmitido ? "" : sugerenciaHoy}" placeholder="—" ${iniciarOmitido ? "disabled" : ""} autocomplete="off">
+            </div>
+            <div style="text-align: center;">
+                <button type="button" class="btn-toggle-estado-concil ${iniciarOmitido ? "modo-reactivar" : ""}" onclick="window.toggleEstadoFilaConciliacion(this)">
+                    ${iniciarOmitido ? "REACTIVAR" : "SIN INDICACIÓN"}
+                </button>
+            </div>
+        `;
+
+        contenedorLista.appendChild(item);
+    });
+
+    if (totalFarmacosEnGrilla === 0) {
+        contenedorLista.innerHTML = `
+            <div style="text-align: center; padding: 30px 15px; color: var(--text-muted); font-size: 13px;">
+                <span class="material-icons-round" style="font-size: 36px; display: block; margin-bottom: 8px; opacity: 0.5;">medication_liquid</span>
+                No hay medicamentos ingresados en la grilla para arrastrar.
+            </div>`;
+    }
+
+    modal.style.display = "flex";
+    setTimeout(() => {
+        modal.classList.add("show");
+        const primerInputHabilitado = contenedorLista.querySelector(".input-hoy-concil:not(:disabled)");
+        if (primerInputHabilitado) {
+            primerInputHabilitado.focus();
+            primerInputHabilitado.select();
+        }
+    }, 15);
+};
+
+window.toggleEstadoFilaConciliacion = function(btn) {
+    const filaItem = btn.closest(".item-conciliacion");
+    const inputHoy = filaItem.querySelector(".input-hoy-concil");
+    const estaOmitido = filaItem.classList.contains("estado-omitido");
+
+    if (estaOmitido) {
+        // Reactivar medicamento para hoy
+        filaItem.classList.remove("estado-omitido");
+        inputHoy.disabled = false;
+        const sugerencia = filaItem.dataset.sugerenciaOriginal || "1";
+        inputHoy.value = sugerencia;
+        btn.textContent = "SIN INDICACIÓN";
+        btn.classList.remove("modo-reactivar");
+        inputHoy.focus();
+        inputHoy.select();
+    } else {
+        // Suspender / Marcar sin indicación hoy
+        filaItem.classList.add("estado-omitido");
+        inputHoy.value = "";
+        inputHoy.disabled = true;
+        btn.textContent = "REACTIVAR";
+        btn.classList.add("modo-reactivar");
+    }
+};
+
+window.cerrarModalConciliacion = function() {
+    const modal = document.getElementById("modal-conciliacion");
+    if (!modal) return;
+    modal.classList.remove("show");
+    setTimeout(() => {
+        modal.style.display = "none";
+        window.columnaConciliacionDestino = null;
+    }, 250);
+};
+
+window.confirmarConciliacionDia = function() {
+    const colIndex = window.columnaConciliacionDestino;
+    if (colIndex === null || colIndex === undefined) return;
+
+    const headersFecha = document.querySelectorAll(".header-fecha");
+    const inputHeader = headersFecha[colIndex];
+    if (!inputHeader) return;
+
+    // 1. Consolidar los saldos del día anterior antes de abrir el nuevo día
     if (colIndex > 0) window.guardarSaldosParaManana();
 
+    // 2. Estampar la fecha de hoy en el encabezado de la columna
     const hoy = new Date();
     const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
     inputHeader.value = `${hoy.getDate()}-${meses[hoy.getMonth()]}`;
 
-    if (colIndex > 0) {
-        const filas = document.querySelectorAll("#grillaFila tr");
-        filas.forEach(fila => {
-            const inputs = fila.querySelectorAll("input");
-            const nombreMed = inputs[0].value.trim().toLowerCase();
-            if (!nombreMed) return; 
-            
-            const inputAyer = inputs[5 + colIndex - 1]; 
-            const inputHoy = inputs[5 + colIndex];
-            
-            if (inputAyer && inputHoy) {
-                const posoTexto = inputs[3].value.trim().toLowerCase();
-                const es48h = posoTexto.includes("48h");
-                const es72h = posoTexto.includes("72h");
+    // 3. Volcar las decisiones del modal hacia la grilla principal
+    const itemsModal = document.querySelectorAll("#lista-farmacos-conciliacion .item-conciliacion");
+    itemsModal.forEach(item => {
+        const rowId = item.dataset.rowId;
+        const esEspecial = item.dataset.esEspecial === "true";
+        const sugerenciaOriginal = item.dataset.sugerenciaOriginal || "";
+        const estaOmitido = item.classList.contains("estado-omitido");
+        const valorElegido = item.querySelector(".input-hoy-concil").value.trim();
 
-                // Interceptor de Albúmina > 3 días en UPC
-                const esAlbumina = nombreMed.includes("albumina") || nombreMed.includes("albúmina");
-                const servicioActual = (document.getElementById("servicio").value || "").toLowerCase();
-                const esUciUti = servicioActual === "uci" || servicioActual === "uti";
+        const filaReal = document.querySelector(`#grillaFila tr[data-row="${rowId}"]`);
+        if (!filaReal) return;
 
-                if (esAlbumina && esUciUti) {
-                    let diasConAlbumina = 0;
-                    for (let d = 0; d < colIndex; d++) {
-                        if (inputs[5 + d].value.trim() !== "") diasConAlbumina++;
-                    }
-                    const firmaAlbumina = `${fila.dataset.row}|${nombreMed}`;
-                    const estadoAlm = window.medicamentosPendientes[firmaAlbumina]?.estado;
+        const inputs = filaReal.querySelectorAll("input");
+        const inputHoyReal = inputs[5 + colIndex];
+        if (!inputHoyReal) return;
 
-                    if (diasConAlbumina >= 3 && estadoAlm !== "ACEPTADO") {
-                        inputHoy.value = "";
-                        setTimeout(() => { inputs[3].dispatchEvent(new Event("change", { bubbles: true })); }, 50);
-                        return;
-                    }
-                }
-
-                const diccEspeciales = ["heparina", "salbutamol", "ipratropio", "brexotide", "budesonida", "fluticasona", "formoterol", "tiotropio", "olodaterol", "nph", "glargina", "cristalina", "diben", "fresubin", "survimed", "jevity", "osmolite", "smofkabiven", "smoflipid", "glucerna", "sodio cloruro", "nacl", "glucosa", "glucosalino", "ringer", "sodio bicarbonato 2/3 molar 250 ml", "cloramfenicol", "lagrima", "lágrima", "pilocarpina", "proparacaina", "proparacaína", "dorzolamida", "latanoprost", "tobramicina"];
-                let medLimpio = window.quitarTildes(nombreMed);
-                let isJarabe = Object.keys(DB_LIQUIDOS).some(k => medLimpio.includes(window.quitarTildes(k.toLowerCase())));
-                const esEspecial = diccEspeciales.some(m => nombreMed.includes(m)) || isJarabe;
-
-                if (!esEspecial) {
-                    const esCarga = posoTexto === "carga"; 
-                    const dosisTexto = inputs[2].value.trim().toLowerCase(); 
-                    const esPomada = dosisTexto.includes("aplicar") || ["nistatina 10", "mometasona", "clotrimazol", "mupirocina", "hidrocortisona 1%", "crema", "pomada", "unguento"].some(s => medLimpio.includes(window.quitarTildes(s))) || inputs[1].value.trim().toLowerCase() === "top";
-
-                    if (esCarga || esPomada) {
-                        inputHoy.value = "";
-                    } else if (es48h || es72h) {
-                        let diasDesdeUltimaDosis = 0;
-                        let ultimaDosisValor = "";
-                        for (let i = colIndex - 1; i >= 0; i--) {
-                            let val = inputs[5 + i].value.trim();
-                            diasDesdeUltimaDosis++;
-                            let num = parseFloat(val);
-                            if (val !== "" && !isNaN(num) && num > 0) {
-                                ultimaDosisValor = val; 
-                                break;
-                            }
-                        }
-                        if (es48h && diasDesdeUltimaDosis === 2 && ultimaDosisValor !== "") {
-                            inputHoy.value = ultimaDosisValor.replace("✓", "").trim(); window.syncCheckUI(inputHoy);
-                        } else if (es72h && diasDesdeUltimaDosis === 3 && ultimaDosisValor !== "") {
-                            inputHoy.value = ultimaDosisValor.replace("✓", "").trim(); window.syncCheckUI(inputHoy);
-                        } else {
-                            inputHoy.value = ""; window.syncCheckUI(inputHoy);
-                        }
-                    } else {
-                        if (inputAyer.value.trim() !== "") {
-                            inputHoy.value = inputAyer.value.replace("✓", "").trim(); window.syncCheckUI(inputHoy);
-                        }
-                    }
-                }
+        if (estaOmitido || valorElegido === "") {
+            // Si se marcó sin indicación, queda vacío y bloqueado como manual para que el motor de saldos no lo sobreescriba
+            inputHoyReal.value = "";
+            inputHoyReal.dataset.manual = "true";
+            window.syncCheckUI(inputHoyReal);
+        } else {
+            // Si es un multidosis/jarabe y el usuario NO tocó el valor sugerido, dejamos que actualizarSaldosYSidebar calcule "T" o frascos exactos
+            if (esEspecial && valorElegido === sugerenciaOriginal) {
+                delete inputHoyReal.dataset.manual;
+            } else {
+                // Si el usuario modificó el número manualmente o es un comprimido normal, fijamos el valor
+                inputHoyReal.value = valorElegido;
+                inputHoyReal.style.color = "var(--text-main)";
+                inputHoyReal.style.fontWeight = "900";
+                inputHoyReal.dataset.manual = "true";
             }
-        });
-    }
+            window.syncCheckUI(inputHoyReal);
+        }
 
+        // Disparar validación de Albúmina si corresponde
+        const nombreMed = inputs[0].value.trim().toLowerCase();
+        if (nombreMed.includes("albumina") || nombreMed.includes("albúmina")) {
+            setTimeout(() => { inputs[3].dispatchEvent(new Event("change", { bubbles: true })); }, 50);
+        }
+    });
+
+    // 4. Actualizar motores clínicos y autoguardado en Firestore
     window.actualizarSaldosYSidebar();
     window.escanearRestringidos();
     window.programarAutoguardado();
 
+    // 5. Efecto visual de confirmación en la cabecera de fecha
     inputHeader.style.background = "var(--accent-green)";
     inputHeader.style.color = "#000";
     setTimeout(() => {
         inputHeader.style.background = "transparent";
         inputHeader.style.color = "var(--accent-blue)";
     }, 800);
+
+    window.cerrarModalConciliacion();
 };
+
+// Navegación rápida con Enter y Escape dentro del Modal de Conciliación
+document.addEventListener("keydown", function(e) {
+    const modalConcil = document.getElementById("modal-conciliacion");
+    if (!modalConcil || !modalConcil.classList.contains("show")) return;
+
+    if (e.key === "Escape") {
+        e.preventDefault();
+        window.cerrarModalConciliacion();
+    } else if (e.key === "Enter" && e.target.classList.contains("input-hoy-concil")) {
+        e.preventDefault();
+        const inputsHabilitados = Array.from(modalConcil.querySelectorAll(".input-hoy-concil:not(:disabled)"));
+        const idx = inputsHabilitados.indexOf(e.target);
+        if (idx > -1 && idx < inputsHabilitados.length - 1) {
+            inputsHabilitados[idx + 1].focus();
+            inputsHabilitados[idx + 1].select();
+        } else {
+            // Si está en el último medicamento y presiona Enter, confirma todo el día
+            window.confirmarConciliacionDia();
+        }
+    }
+});
 
 // ============================================================================
 // 8. ESCÁNERES CLÍNICOS CDSS (SOBREDOSIS, ALERGIAS, INTERACCIONES, RESTRINGIDOS)
@@ -1759,24 +2003,64 @@ window.escanearRestringidos = function() {
 
         if (protocolo) {
             firmasActivas.add(firmaRestringido);
-            let estadoActual = window.medicamentosPendientes[firmaRestringido]?.estado;
-            let memoriaOC = window.medicamentosPendientes[firmaRestringido]?.diasOC;
 
+            // 1. REVISAR SI YA ESTÁ ACEPTADO EN MEMORIA O EN CUALQUIER OTRA FILA DEL MISMO FÁRMACO
+            let registroExistente = window.medicamentosPendientes[firmaRestringido];
+            if (!registroExistente || registroExistente.estado !== "ACEPTADO") {
+                const keyPrevia = Object.keys(window.medicamentosPendientes).find(
+                    k => window.medicamentosPendientes[k]?.medicamento === nombreMed && window.medicamentosPendientes[k]?.estado === "ACEPTADO"
+                );
+                if (keyPrevia) registroExistente = window.medicamentosPendientes[keyPrevia];
+            }
+
+            let estadoActual = registroExistente?.estado;
+            let memoriaOC = registroExistente?.diasOC;
+            let medicoAutorizador = registroExistente?.medicoAutorizador || "";
+
+            // 2. BLINDAJE VISUAL: Si la celda de la grilla ya dice AUTORIZADO, forzar estado ACEPTADO
+            if (celdaAlerta.value.includes("AUTORIZADO")) {
+                estadoActual = "ACEPTADO";
+            }
+
+            // 3. VERIFICAR ETIQUETA [OC:XX] EN POSOLOGÍA
             let matchOC = posoTexto.match(/\[OC:\s*(\d+)\]/i);
             if (matchOC && tipoRestriccion === "ORDEN_COMPRA") {
                 estadoActual = "ACEPTADO";
                 memoriaOC = parseInt(matchOC[1]);
             }
 
-            if (estadoActual) {
-                window.medicamentosPendientes[firmaRestringido] = { estado: estadoActual, rowId, medicamento: nombreMed, especialidad: protocolo.especialidad, medicos: protocolo.medicos, tipo: tipoRestriccion, diasOC: memoriaOC };
+            // SI YA ESTÁ ACEPTADO, EVITAR CUALQUIER ALERTA O MODAL
+            if (estadoActual === "ACEPTADO") {
+                window.medicamentosPendientes[firmaRestringido] = { 
+                    estado: "ACEPTADO", 
+                    rowId, 
+                    medicamento: nombreMed, 
+                    especialidad: protocolo.especialidad, 
+                    medicos: protocolo.medicos, 
+                    tipo: tipoRestriccion, 
+                    diasOC: memoriaOC,
+                    medicoAutorizador: medicoAutorizador
+                };
+                window.alertasEmitidas.add(firmaRestringido);
+                celdaAlerta.classList.remove("alerta-interaccion");
+                if (!celdaAlerta.classList.contains("alerta-sobredosis")) {
+                    celdaAlerta.value = "✅ AUTORIZADO";
+                    celdaAlerta.style.color = "var(--accent-green)";
+                }
                 requiereActualizarSidebar = true;
+                return; // <-- Salta esta fila por completo, está blindada
             }
-            
-            estadoActual = window.medicamentosPendientes[firmaRestringido]?.estado;
 
+            // SI NO ESTÁ ACEPTADO, EVALUAR ESTADOS PENDIENTE O NUEVA ALERTA
             if (!estadoActual || estadoActual === "ESPERANDO_DECISION") {
-                window.medicamentosPendientes[firmaRestringido] = { estado: "ESPERANDO_DECISION", rowId, medicamento: nombreMed, especialidad: protocolo.especialidad, medicos: protocolo.medicos, tipo: tipoRestriccion };
+                window.medicamentosPendientes[firmaRestringido] = { 
+                    estado: "ESPERANDO_DECISION", 
+                    rowId, 
+                    medicamento: nombreMed, 
+                    especialidad: protocolo.especialidad, 
+                    medicos: protocolo.medicos, 
+                    tipo: tipoRestriccion 
+                };
                 celdaAlerta.classList.add("alerta-interaccion"); 
                 if (!celdaAlerta.classList.contains("alerta-sobredosis")) {
                     celdaAlerta.value = tipoRestriccion === "ALBUMINA" ? "⚠️ EXTENSIÓN" : "⚠️ RESTRINGIDO";
@@ -1787,24 +2071,10 @@ window.escanearRestringidos = function() {
                     window.mostrarModalRestringido(firmaRestringido);
                 }
             } else if (estadoActual === "PENDIENTE") {
+                window.alertasEmitidas.add(firmaRestringido);
                 celdaAlerta.classList.add("alerta-interaccion");
                 celdaAlerta.value = "⏳ PENDIENTE";
                 celdaAlerta.style.color = "#ff9800";
-                requiereActualizarSidebar = true;
-            } else if (estadoActual === "ACEPTADO") {
-                celdaAlerta.classList.remove("alerta-interaccion");
-                if (!celdaAlerta.classList.contains("alerta-sobredosis")) {
-                    celdaAlerta.value = "✅ AUTORIZADO";
-                    celdaAlerta.style.color = "var(--accent-green)";
-                }
-                if (tipoRestriccion === "ORDEN_COMPRA") {
-                    let limiteOC = window.medicamentosPendientes[firmaRestringido].diasOC || 0;
-                    let primeraCol = -1;
-                    for (let d = 0; d < 10; d++) { if (inputs[5 + d] && inputs[5 + d].value.trim() !== "") { primeraCol = d; break; } }
-                    if (primeraCol !== -1) {
-                        for (let d = primeraCol + limiteOC; d < 10; d++) { if (inputs[5 + d]) inputs[5 + d].value = ""; }
-                    }
-                }
                 requiereActualizarSidebar = true;
             }
         }
@@ -1813,8 +2083,10 @@ window.escanearRestringidos = function() {
     for (let firma in window.medicamentosPendientes) {
         if (!firmasActivas.has(firma)) delete window.medicamentosPendientes[firma]; 
     }
-    let rutAct = document.getElementById("rut").value.trim() || ((document.getElementById("servicio").value || "sin") + "_" + (document.getElementById("cama").value || "sincama"));
+    let idCamaFallback = ((document.getElementById("servicio").value || "sin") + "_" + (document.getElementById("cama").value || "sincama")).toLowerCase().replace(/\s+/g, '_');
+    let rutAct = document.getElementById("rut").value.trim() || idCamaFallback;
     localStorage.setItem("pendientes_" + rutAct, JSON.stringify(window.medicamentosPendientes));
+    localStorage.setItem("pendientes_" + idCamaFallback, JSON.stringify(window.medicamentosPendientes));
     if (requiereActualizarSidebar) window.actualizarSidebarPendientes();
 };
 
