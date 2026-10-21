@@ -1136,7 +1136,9 @@ window.calcularDosisFila = function (medTexto, viaTexto, dosisTexto, posoTexto, 
         }
     }
     else if (dosisTexto.includes("sobre")) {
-        resultado = Math.ceil(dosis * factor * factorDias);
+        let factorCalculo = factor < 1 ? 1 : factor;
+        let tomasEnPeriodo = Math.ceil(factorCalculo * factorDias);
+        resultado = Math.ceil(dosis * tomasEnPeriodo);
     }
     else if (dosisTexto.includes("aplicar") || dosisTexto.includes("puff") || dosisTexto.includes("gota") || viaTexto.includes("oft") || ["crema", "pomada", "nistatina 10", "mometasona", "clotrimazol", "mupirocina", "hidrocortisona 1%"].some(t => medTexto.includes(t))) {
         resultado = 1;
@@ -1150,24 +1152,28 @@ window.calcularDosisFila = function (medTexto, viaTexto, dosisTexto, posoTexto, 
         const esAmpolla = medTexto.includes("ampolla") || medTexto.includes("furosemida 20 mg/2 ml") || medTexto.includes("amp") || (esInyectable && !esFrasco);
         const dosisEsML = dosisTexto.includes("ml") || dosisTexto.includes("cc");
 
+        let factorCalculo = factor < 1 ? 1 : factor;
+        // Calculamos cuántas administraciones (tomas) ocurren dentro de las horas/días seleccionados (mínimo 1 toma)
+        let tomasEnPeriodo = Math.ceil(factorCalculo * factorDias);
+
         if (esLiquido && !esAmpolla) {
             let volumenDosisML = dosis;
             if (!dosisEsML && concentracionMasa > 0) volumenDosisML = (dosis * 1) / concentracionMasa;
             let capacidadFrasco = medTexto.includes("valproico") ? 120 : 100;
-            resultado = Math.ceil((volumenDosisML * factor * factorDias) / capacidadFrasco) || 1;
+            resultado = Math.ceil((volumenDosisML * tomasEnPeriodo) / capacidadFrasco) || 1;
         }
-        else if (esAmpolla || esCapsula) {
+        else if (esAmpolla || esCapsula || esFrasco) {
             if (concentracionMasa > 0) {
                 let volumenAmpolla = window.extraerConcentracionPro(medTexto) || 1;
                 let unidadesPorDosis = dosisEsML ? (dosis / volumenAmpolla) : (dosis / concentracionMasa);
-                let factorCalculo = factor < 1 ? 1 : factor; 
-                resultado = Math.ceil(Math.ceil(unidadesPorDosis) * factorCalculo * factorDias);
+                // En viales, ampollas y cápsulas, cada toma individual requiere unidades enteras (no se parte un vial a la mitad entre días)
+                resultado = Math.ceil(unidadesPorDosis) * tomasEnPeriodo;
             }
         }
         else {
             if (concentracionMasa > 0) {
-                let factorCalculo = factor < 1 ? 1 : factor;
-                resultado = Math.ceil((dosis / concentracionMasa) * factorCalculo * factorDias);
+                // En comprimidos orales, se multiplica la dosis de cada toma por el número de tomas del período
+                resultado = Math.ceil((dosis / concentracionMasa) * tomasEnPeriodo);
             }
         }
     }
