@@ -382,10 +382,17 @@
                 <tr>
                     <th style="border-top: none; border-left: none; background: transparent;"></th>
                     <th colspan="3" class="dark-th" style="padding: 4px;">
-                        <div
-                            style="display: flex; justify-content: center; align-items: center; gap: 8px; color: var(--text-muted); font-size: 11px;">
-                            Días a despachar
-                            <input type="number" id="inputDias" tabindex="-1" value="1" min="1" max="10">
+                        <div style="display: flex; justify-content: center; align-items: center; gap: 6px; color: var(--text-muted); font-size: 10.5px; flex-wrap: nowrap;">
+                            <span>Días:</span>
+                            <input type="number" id="inputDias" tabindex="-1" value="1" min="1" max="10" style="width: 38px;">
+                            <span style="opacity: 0.3;">|</span>
+                            <span title="Cálculo parcial por horas para Farmacia 24h (Turno Noche)">Horas:</span>
+                            <select id="selectHorasDespacho" tabindex="-1" title="Seleccione horas a cubrir hasta apertura de Farmacia Central" style="background: rgba(64, 196, 255, 0.12); color: var(--accent-blue); border: 1px solid var(--accent-blue); border-radius: 6px; padding: 2px 4px; font-size: 11px; font-weight: 900; cursor: pointer; outline: none;">
+                                <option value="24" selected>24h (1 Día)</option>
+                                <option value="12">12 hrs</option>
+                                <option value="8">8 hrs</option>
+                                <option value="6">6 hrs</option>
+                            </select>
                         </div>
                     </th>
                     <th class="dark-th" style="font-size: 10px;">CDSS</th>
@@ -753,7 +760,7 @@
   <!-- 8. MODAL DE CONCILIACIÓN ACTIVA (VALIDACIÓN DE ARRASTRE)          -->
   <!-- ================================================================= -->
   <div id="modal-conciliacion" class="modal-overlay" style="z-index: 9999999; display: none;">
-    <div class="modal-container" style="width: 680px; max-height: 88vh; display: flex; flex-direction: column;">
+    <div class="modal-container" style="width: 880px; max-width: 96vw; max-height: 90vh; display: flex; flex-direction: column;">
       
       <div class="modal-header" style="flex-direction: column; justify-content: center; text-align: center; gap: 6px;">
         <span class="material-icons-round icon" style="color: var(--accent-green); font-size: 44px; background: rgba(0,230,118,0.1); padding: 12px; border-radius: 50%;">fact_check</span>

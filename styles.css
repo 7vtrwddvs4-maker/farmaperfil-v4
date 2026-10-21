@@ -785,34 +785,41 @@ body.light-theme .input-pill select {
 }
 
 /* =========================================================
-   FILA DE NUEVO MEDICAMENTO DENTRO DE CONCILIACIÓN
+   FILA DE NUEVO MEDICAMENTO DENTRO DE CONCILIACIÓN (AMPLIADA)
    ========================================================= */
 .item-conciliacion-nuevo {
     display: grid;
-    grid-template-columns: 2.2fr 0.8fr 0.9fr 1.2fr;
-    gap: 10px;
+    grid-template-columns: 2.6fr 0.6fr 0.8fr 1fr;
+    gap: 12px;
     align-items: center;
-    padding: 10px 12px;
-    border-radius: 12px;
-    background: rgba(64, 196, 255, 0.07);
-    border: 1px solid rgba(64, 196, 255, 0.4);
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: rgba(64, 196, 255, 0.08);
+    border: 1.5px solid rgba(64, 196, 255, 0.45);
     transition: all 0.2s ease;
 }
 
 .grid-inputs-nuevo-concil {
     display: grid;
-    grid-template-columns: 2.2fr 0.6fr 0.9fr 0.9fr;
-    gap: 6px;
+    grid-template-columns: 1fr 1.2fr 1.2fr;
+    gap: 8px;
+}
+
+.input-nuevo-concil.inp-nuevo-med {
+    grid-column: 1 / -1; /* Ocupa todo el ancho superior para ver el nombre completo */
+    font-size: 14.5px;
+    padding: 9px 12px;
+    border-color: rgba(64, 196, 255, 0.5);
 }
 
 .input-nuevo-concil {
     width: 100%;
-    padding: 6px 8px;
-    border-radius: 6px;
+    padding: 8px 10px;
+    border-radius: 8px;
     border: 1px solid var(--glass-border);
-    background: rgba(0, 0, 0, 0.3);
+    background: rgba(0, 0, 0, 0.35);
     color: var(--text-main);
-    font-size: 12px;
+    font-size: 13.5px;
     font-weight: 700;
     outline: none;
     box-sizing: border-box;

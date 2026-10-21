@@ -65,21 +65,21 @@ const PROTOCOLOS_RESTRINGIDOS = {
     "hidrocortisona 1%": { especialidad: "Dermatología", medicos: ["Equipo Dermatología"] }
 };
 
-const DB_LIQUIDOS = { 
-    "Amoxicilina 250 mg/5 mL": { mg: 250, ml: 5, total: 60 }, 
-    "Amoxicilina 500 mg/5 mL": { mg: 500, ml: 5, total: 60 }, 
-    "Ácido Ursodesoxicólico 250 mg/5 mL": { mg: 250, ml: 5, total: 200 }, 
-    "Ácido Valproico 250 mg/5 mL": { mg: 250, ml: 5, total: 120 }, 
-    "Azitromicina 200 mg/5 mL": { mg: 200, ml: 5, total: 30 }, 
-    "Cefadroxilo 250 mg/5 mL": { mg: 250, ml: 5, total: 60 }, 
-    "Levetiracetam 100 mg/mL": { mg: 100, ml: 1, total: 300 }, 
-    "Paracetamol 120 mg/5 mL": { mg: 120, ml: 5, total: 60 }, 
+const DB_LIQUIDOS = {
+    "Amoxicilina 250 mg/5 mL": { mg: 250, ml: 5, total: 60 },
+    "Amoxicilina 500 mg/5 mL": { mg: 500, ml: 5, total: 60 },
+    "Ácido Ursodesoxicólico 250 mg/5 mL": { mg: 250, ml: 5, total: 200 },
+    "Ácido Valproico 250 mg/5 mL": { mg: 250, ml: 5, total: 120 },
+    "Azitromicina 200 mg/5 mL": { mg: 200, ml: 5, total: 30 },
+    "Cefadroxilo 250 mg/5 mL": { mg: 250, ml: 5, total: 60 },
+    "Levetiracetam 100 mg/mL": { mg: 100, ml: 1, total: 300 },
+    "Paracetamol 120 mg/5 mL": { mg: 120, ml: 5, total: 60 },
     "Risperidona 1 mg/mL": { mg: 1, ml: 1, total: 30, gotas: "" },
     "N-Acetil-Cisteína 100 mg/mL": { mg: 100, ml: 1, total: 60 },
     "Sulfato Ferroso 125 mg/1 mL": { mg: 125, ml: 1, total: 30, gotas: "" },
     "Ferroso Sulfato 125 mg/mL": { mg: 125, ml: 1, total: 30, gotas: "" },
     "Sulfato de Zinc 5 mg/1 mL": { mg: 5, ml: 1, total: 30, gotas: "" },
-    "Vitamina ACD 2500 UI/1 mL": { mg: 2500, ml: 1, total: 30, gotas: "" }, 
+    "Vitamina ACD 2500 UI/1 mL": { mg: 2500, ml: 1, total: 30, gotas: "" },
     "Tramadol 100 mg/1 mL": { mg: 100, ml: 1, total: 10, gotas: "" },
     "BioGaia (Probiótico)": { biogaia: true }
 };
@@ -100,7 +100,7 @@ const CAMAS_URGENCIA_ADULTO = [
 
 const mapaCamasHospital = {
     "medicina": { inicio: 1, fin: 40 },
-    "cirugia": { inicio: 1, fin: 47 },
+    "cirugia": { inicio: 1, fin: 48 },
     "uci": { inicio: 1, fin: 17 },
     "uti": { inicio: 18, fin: 34 },
     "ucm": { inicio: 1, fin: 24 },
@@ -128,16 +128,16 @@ const dictDiagnosticos = {
 // ============================================================================
 // 2. UTILIDADES DE INTERFAZ, RUT, TEMA Y CASILLAS (TICKS)
 // ============================================================================
-window.quitarTildes = function(texto) {
+window.quitarTildes = function (texto) {
     return (texto || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 };
 
-window.toggleTheme = function() {
+window.toggleTheme = function () {
     const isLight = document.body.classList.toggle("light-theme");
     const icon = document.getElementById("theme-icon");
     if (icon) icon.textContent = isLight ? "dark_mode" : "light_mode";
     localStorage.setItem("themePreference", isLight ? "light" : "dark");
-    
+
     const themeMsg = { tema: isLight ? 'light' : 'dark' };
     const iframeCalc = document.getElementById('iframeCalculadora');
     if (iframeCalc && iframeCalc.contentWindow) iframeCalc.contentWindow.postMessage(themeMsg, '*');
@@ -145,7 +145,7 @@ window.toggleTheme = function() {
     if (iframeDesp && iframeDesp.contentWindow) iframeDesp.contentWindow.postMessage(themeMsg, '*');
 };
 
-window.validarRut = function(input) {
+window.validarRut = function (input) {
     if (!input) return;
     let valor = input.value.replace(/[^0-9kK]/g, '').toUpperCase();
     if (valor.length < 2) {
@@ -155,7 +155,7 @@ window.validarRut = function(input) {
     let cuerpo = valor.slice(0, -1);
     let dv = valor.slice(-1);
     input.value = cuerpo + "-" + dv;
-    
+
     let suma = 0; let multiplo = 2;
     for (let i = 1; i <= cuerpo.length; i++) {
         let index = multiplo * valor.charAt(cuerpo.length - i);
@@ -164,7 +164,7 @@ window.validarRut = function(input) {
     }
     let dvEsperado = 11 - (suma % 11);
     dvEsperado = (dvEsperado == 10) ? "K" : (dvEsperado == 11) ? "0" : dvEsperado.toString();
-    
+
     if (dv !== dvEsperado) {
         input.classList.add("input-warning");
     } else {
@@ -172,31 +172,41 @@ window.validarRut = function(input) {
     }
 };
 
-window.toggleTick = function(btn) {
+window.toggleTick = function (btn) {
     const input = btn.previousElementSibling;
     if (!input || !input.value.trim()) return;
-    
+
     if (btn.classList.contains("ticked")) {
         btn.classList.remove("ticked");
-        delete input.dataset.manual; 
+        delete input.dataset.manual;
     } else {
         btn.classList.add("ticked");
-        input.dataset.manual = "true"; 
+        input.dataset.manual = "true";
     }
-    input.dispatchEvent(new Event("change", { bubbles: true })); 
+    input.dispatchEvent(new Event("change", { bubbles: true }));
 };
 
-window.syncCheckUI = function(input) {
+window.syncCheckUI = function (input) {
     if (!input) return;
     const btn = input.nextElementSibling;
+    const valUpper = input.value.replace("✓", "").trim().toUpperCase();
+
+    if (valUpper === "S/I" || valUpper === "-") {
+        input.dataset.omitidoConciliacion = "true";
+        input.dataset.manual = "true";
+        input.style.color = valUpper === "S/I" ? "var(--accent-red)" : "var(--text-muted)";
+        input.style.fontWeight = "800";
+        if (btn && btn.classList.contains("btn-check")) btn.classList.remove("ticked");
+        return;
+    }
+
     if (btn && btn.classList.contains("btn-check")) {
         if (input.value.includes("✓")) {
             btn.classList.add("ticked");
             input.dataset.manual = "true";
-            input.value = input.value.replace("✓", "").trim(); 
+            input.value = input.value.replace("✓", "").trim();
         } else if (input.value.trim() === "") {
             btn.classList.remove("ticked");
-            // Si fue marcado "Sin indicación" en la conciliación, mantenemos manual="true" para que Nutriciones/Multidosis no lo rellenen solos
             if (input.dataset.omitidoConciliacion !== "true") {
                 delete input.dataset.manual;
             }
@@ -204,7 +214,7 @@ window.syncCheckUI = function(input) {
     }
 };
 
-window.mostrarToastFarmacia = function(mensaje, titulo) {
+window.mostrarToastFarmacia = function (mensaje, titulo) {
     let container = document.getElementById("toast-container");
     if (!container) {
         container = document.createElement("div");
@@ -223,7 +233,7 @@ window.mostrarToastFarmacia = function(mensaje, titulo) {
 // ============================================================================
 // 3. AUTENTICACIÓN, REGISTRO Y CONFIGURACIÓN MAESTRA (FIRESTORE)
 // ============================================================================
-window.intentarLogin = async function() {
+window.intentarLogin = async function () {
     const rutInput = document.getElementById("loginRut").value.trim().toUpperCase();
     const pinInput = document.getElementById("loginPin").value.trim();
     const errorDiv = document.getElementById("loginError");
@@ -271,13 +281,13 @@ window.intentarLogin = async function() {
     }
 };
 
-window.mostrarRegistro = function() {
+window.mostrarRegistro = function () {
     document.getElementById("loginStepCredentials").style.display = "none";
     document.getElementById("loginStepRegister").style.display = "block";
     document.getElementById("regError").style.display = "none";
 };
 
-window.ocultarRegistro = function() {
+window.ocultarRegistro = function () {
     document.getElementById("loginStepRegister").style.display = "none";
     document.getElementById("loginStepCredentials").style.display = "block";
     document.getElementById("loginError").style.display = "none";
@@ -287,11 +297,11 @@ window.ocultarRegistro = function() {
     document.getElementById("regPin").value = "";
 };
 
-window.olvidePin = function() {
+window.olvidePin = function () {
     alert("🔒 SEGURIDAD CLÍNICA\n\nPor protocolos de seguridad, las contraseñas no pueden ser recuperadas de forma automática.\n\nSi olvidó su PIN de 4 dígitos, por favor contacte al Administrador del Sistema para verificar su identidad.");
 };
 
-window.ejecutarRegistro = async function() {
+window.ejecutarRegistro = async function () {
     const nombre = document.getElementById("regNombre").value.trim().toUpperCase();
     const rut = document.getElementById("regRut").value.trim().toUpperCase();
     const rol = document.getElementById("regRol").value;
@@ -342,25 +352,25 @@ window.ejecutarRegistro = async function() {
     btn.disabled = false;
 };
 
-window.cerrarSesion = function() {
+window.cerrarSesion = function () {
     if (typeof window.validarSalidaSegura === "function" && !window.validarSalidaSegura()) return;
     sessionStorage.removeItem("FarmaPerfil_Sesion");
     document.getElementById("loginRut").value = "";
     document.getElementById("loginPin").value = "";
     document.getElementById("btnIngresar").innerText = "INGRESAR AL SISTEMA";
     document.getElementById("btnIngresar").disabled = false;
-    
+
     document.getElementById("loginStepService").style.display = "none";
     document.getElementById("loginStepCredentials").style.display = "block";
-    
+
     const overlay = document.getElementById("loginOverlay");
     overlay.style.display = "flex";
     setTimeout(() => { overlay.style.opacity = "1"; document.getElementById("loginRut").focus(); }, 50);
 };
 
-window.volverAlMenuPrincipal = function() {
+window.volverAlMenuPrincipal = function () {
     if (typeof window.validarSalidaSegura === "function" && !window.validarSalidaSegura()) return;
-    window.limpiarFormularioPerfil(); 
+    window.limpiarFormularioPerfil();
     document.body.classList.remove("modo-historico");
     window.isModoHistorico = false;
     const status = document.getElementById("statusGuardado");
@@ -370,11 +380,11 @@ window.volverAlMenuPrincipal = function() {
     if (overlay) { overlay.style.display = "flex"; setTimeout(() => overlay.style.opacity = "1", 10); }
 };
 
-window.cargarListasMaestras = async function() {
+window.cargarListasMaestras = async function () {
     try {
         const docListas = await getDoc(doc(window.db, "config_maestra", "listas_desplegables"));
         const docCatalogo = await getDoc(doc(window.db, "config_maestra", "catalogo_cdss"));
-        
+
         if (docListas.exists()) {
             const datos = docListas.data();
             window.datosGlobales = {
@@ -390,7 +400,7 @@ window.cargarListasMaestras = async function() {
 
             const loginSelect = document.getElementById("loginServicioSelect");
             const selectServicio = document.getElementById("servicio");
-            
+
             if (window.datosGlobales.servicios.length > 0) {
                 if (loginSelect) loginSelect.innerHTML = '<option value="" disabled selected hidden>Seleccione Servicio...</option>';
                 if (selectServicio) selectServicio.innerHTML = '<option value="" disabled selected hidden>Seleccione...</option>';
@@ -399,7 +409,7 @@ window.cargarListasMaestras = async function() {
                     if (selectServicio) selectServicio.appendChild(new Option(s, s));
                 });
             }
-            
+
             const dlCamas = document.getElementById("listaCamas");
             if (dlCamas && window.datosGlobales.camas.length > 0) {
                 dlCamas.innerHTML = "";
@@ -432,11 +442,11 @@ window.cargarListasMaestras = async function() {
     }
 };
 
-window.cargarDashboardBienvenida = async function() {
+window.cargarDashboardBienvenida = async function () {
     try {
         const docAvisos = await getDoc(doc(window.db, "config_maestra", "pizarra_avisos"));
         let htmlAvisos = "";
-        
+
         if (docAvisos.exists() && docAvisos.data().mensajes) {
             docAvisos.data().mensajes.forEach(m => {
                 let esPeligro = m.includes("⚠️") || m.includes("❌") || m.includes("🚨") || m.toLowerCase().includes("quiebre") || m.toLowerCase().includes("urgente");
@@ -499,13 +509,13 @@ window.cargarDashboardBienvenida = async function() {
 // ============================================================================
 // 4. NAVEGACIÓN DE SERVICIOS, CAMAS Y LECTURA/ESCRITURA FIRESTORE
 // ============================================================================
-window.actualizarDropdownCamas = function(idServicio, idCama) {
+window.actualizarDropdownCamas = function (idServicio, idCama) {
     const selectServicio = document.getElementById(idServicio);
     const selectCama = document.getElementById(idCama);
     if (!selectServicio || !selectCama) return;
 
     const servicioElegido = selectServicio.value;
-    selectCama.innerHTML = ""; 
+    selectCama.innerHTML = "";
 
     if (!servicioElegido) {
         selectCama.appendChild(new Option("Seleccione Servicio...", ""));
@@ -514,7 +524,7 @@ window.actualizarDropdownCamas = function(idServicio, idCama) {
 
     let servicioNormalizado = window.quitarTildes(servicioElegido.toLowerCase());
     const config = mapaCamasHospital[servicioNormalizado];
-    
+
     if (config) {
         if (config.personalizado) {
             config.personalizado.forEach(camaNombre => {
@@ -532,31 +542,31 @@ window.actualizarDropdownCamas = function(idServicio, idCama) {
     }
 };
 
-window.comenzarTurnoWeb = function() {
+window.comenzarTurnoWeb = function () {
     const servicioSeleccionado = document.getElementById("loginServicioSelect").value;
     if (!servicioSeleccionado) { alert("Por favor seleccione un servicio."); return; }
-    
+
     const selectPrincipal = document.getElementById("servicio");
     if (selectPrincipal && window.datosGlobales && window.datosGlobales.servicios) {
         selectPrincipal.innerHTML = '<option value="" disabled hidden>Seleccione...</option>';
         window.datosGlobales.servicios.sort().forEach(s => selectPrincipal.appendChild(new Option(s, s)));
     }
-    selectPrincipal.value = servicioSeleccionado; 
-    
+    selectPrincipal.value = servicioSeleccionado;
+
     window.actualizarDropdownCamas("servicio", "cama");
-    
+
     const usuario = JSON.parse(sessionStorage.getItem("FarmaPerfil_Sesion") || "{}");
     const overlay = document.getElementById("loginOverlay");
     overlay.style.opacity = "0";
     setTimeout(() => { overlay.style.display = "none"; }, 500);
-    
+
     if (usuario.nombre) document.getElementById("displayUserName").innerText = usuario.nombre;
     if (usuario.rol) document.getElementById("displayUserRole").innerText = usuario.rol;
 
     window.cargarTratamientoPacienteCama();
 };
 
-window.cambiarServicioUI = function() {
+window.cambiarServicioUI = function () {
     if (typeof window.validarSalidaSegura === "function" && !window.validarSalidaSegura()) {
         if (window.servicioActivoSeguro) document.getElementById("servicio").value = window.servicioActivoSeguro;
         return;
@@ -566,13 +576,13 @@ window.cambiarServicioUI = function() {
     window.cargarTratamientoPacienteCama();
 };
 
-window.cambiarCamaNavegacion = function(direccion) {
+window.cambiarCamaNavegacion = function (direccion) {
     if (typeof window.validarSalidaSegura === "function" && !window.validarSalidaSegura()) return;
     const selectorCama = document.getElementById("cama");
     if (!selectorCama || selectorCama.options.length === 0) return;
 
     let indiceActual = selectorCama.selectedIndex;
-    if (indiceActual === -1) indiceActual = 0; 
+    if (indiceActual === -1) indiceActual = 0;
 
     let nuevoIndice = indiceActual + direccion;
     if (nuevoIndice >= 0 && nuevoIndice < selectorCama.options.length) {
@@ -585,11 +595,11 @@ window.cambiarCamaNavegacion = function(direccion) {
         clearTimeout(window.temporizadorNavegacionCama);
         window.temporizadorNavegacionCama = setTimeout(() => {
             window.cargarTratamientoPacienteCama();
-        }, 300); 
+        }, 300);
     }
 };
 
-window.limpiarFormularioPerfil = function() {
+window.limpiarFormularioPerfil = function () {
     document.getElementById("rut").value = "";
     document.getElementById("rut").classList.remove("input-warning");
     document.getElementById("paciente").value = "";
@@ -612,12 +622,13 @@ window.limpiarFormularioPerfil = function() {
             inp.style.color = "";
             delete inp.dataset.manual;
             delete inp.dataset.pendiente;
+            delete inp.dataset.omitidoConciliacion;
             window.syncCheckUI(inp);
         });
         const msg = fila.querySelector(".mensaje-reaccion");
         if (msg) msg.style.display = "none";
     });
-    
+
     const sidebarSaldos = document.getElementById("sidebar-saldos-content");
     if (sidebarSaldos) {
         sidebarSaldos.innerHTML = `
@@ -632,7 +643,7 @@ window.limpiarFormularioPerfil = function() {
     window.alertasEmitidas.clear();
 };
 
-window.cargarTratamientoPacienteCama = async function() {
+window.cargarTratamientoPacienteCama = async function () {
     if (typeof window.validarSalidaSegura === "function" && !window.validarSalidaSegura()) {
         if (window.camaActivaSegura) document.getElementById("cama").value = window.camaActivaSegura;
         return;
@@ -641,10 +652,10 @@ window.cargarTratamientoPacienteCama = async function() {
     const servicio = document.getElementById("servicio").value;
     const cama = document.getElementById("cama").value;
     if (!servicio || !cama) return;
-    
+
     window.camaActivaSegura = cama;
     window.servicioActivoSeguro = servicio;
-    
+
     const status = document.getElementById("statusGuardado");
     if (status) status.innerHTML = `<span class="material-icons-round" style="font-size: 18px; color: var(--accent-blue);">sync</span> <span style="color: var(--accent-blue);">Descargando de Firebase...</span>`;
 
@@ -658,7 +669,7 @@ window.cargarTratamientoPacienteCama = async function() {
 
         if (docSnap.exists()) {
             const res = docSnap.data();
-            
+
             document.getElementById("rut").value = res.rut || "";
             if (res.rut) window.validarRut(document.getElementById("rut"));
             document.getElementById("paciente").value = res.nombre || "";
@@ -668,14 +679,14 @@ window.cargarTratamientoPacienteCama = async function() {
             document.getElementById("diagnostico").value = res.diagnostico || "";
             document.getElementById("alergiaPaciente").value = res.alergia || "";
             document.getElementById("genero").value = res.genero || "";
-            
+
             const inputsFecha = document.querySelectorAll(".header-fecha");
             if (res.fechasCabecera) {
                 res.fechasCabecera.forEach((fec, idx) => {
                     if (inputsFecha[idx]) inputsFecha[idx].value = fec;
                 });
             }
-            
+
             const filas = document.querySelectorAll("#grillaFila tr");
             if (res.medicamentos) {
                 res.medicamentos.forEach((med, idx) => {
@@ -685,7 +696,7 @@ window.cargarTratamientoPacienteCama = async function() {
                         inputs[1].value = med.via || "";
                         inputs[2].value = med.dosis || "";
                         inputs[3].value = med.posologia || "";
-                        
+
                         for (let d = 0; d < 10; d++) {
                             if (inputs[5 + d] && med.dias && med.dias[d] !== undefined) {
                                 inputs[5 + d].value = med.dias[d];
@@ -702,7 +713,7 @@ window.cargarTratamientoPacienteCama = async function() {
         }
 
         if (status) status.innerHTML = `<span class="material-icons-round" style="font-size: 18px; color: var(--accent-green);">cloud_done</span> <span style="color: var(--text-muted);">Nube actualizada</span>`;
-        
+
         setTimeout(() => {
             let rutActual = document.getElementById("rut").value.trim() || idCama;
             window.medicamentosPendientes = JSON.parse(localStorage.getItem("pendientes_" + rutActual)) || {};
@@ -710,8 +721,8 @@ window.cargarTratamientoPacienteCama = async function() {
             window.actualizarSaldosYSidebar();
             window.escanearInteraccionesGlobales();
             window.escanearAlergias();
-            window.escanearRestringidos(); 
-            
+            window.escanearRestringidos();
+
             window.isCargandoPerfil = false;
         }, 200);
 
@@ -722,7 +733,7 @@ window.cargarTratamientoPacienteCama = async function() {
     }
 };
 
-window.ejecutarGuardadoSilencioso = async function(servicio, cama) {
+window.ejecutarGuardadoSilencioso = async function (servicio, cama) {
     if (window.isCargandoPerfil || window.isModoHistorico) return;
     try {
         const paciente = {
@@ -747,12 +758,12 @@ window.ejecutarGuardadoSilencioso = async function(servicio, cama) {
             const inputs = fila.querySelectorAll("input");
             const farmaco = inputs[0].value.trim();
             if (farmaco !== "") {
-                const med = { 
-                    farmaco: farmaco, 
-                    via: inputs[1].value.trim(), 
-                    dosis: inputs[2].value.trim(), 
-                    posologia: inputs[3].value.trim(), 
-                    dias: [] 
+                const med = {
+                    farmaco: farmaco,
+                    via: inputs[1].value.trim(),
+                    dosis: inputs[2].value.trim(),
+                    posologia: inputs[3].value.trim(),
+                    dias: []
                 };
                 for (let i = 0; i < 10; i++) {
                     let cellVal = "";
@@ -775,7 +786,7 @@ window.ejecutarGuardadoSilencioso = async function(servicio, cama) {
 
         window.datosSincronizados = true;
         window.hayCambiosSinGuardar = false;
-        
+
         const status = document.getElementById("statusGuardado");
         if (status) status.innerHTML = `<span class="material-icons-round" style="font-size: 18px; color: var(--accent-green);">cloud_done</span> <span style="color: var(--text-muted);">Nube actualizada</span>`;
 
@@ -786,7 +797,7 @@ window.ejecutarGuardadoSilencioso = async function(servicio, cama) {
     }
 };
 
-window.programarAutoguardado = function() {
+window.programarAutoguardado = function () {
     if (window.isModoHistorico || window.isCargandoPerfil) return;
 
     const servicio = document.getElementById("servicio").value;
@@ -804,14 +815,14 @@ window.programarAutoguardado = function() {
     clearTimeout(window.temporizadorGuardado);
     window.temporizadorGuardado = setTimeout(() => {
         window.ejecutarGuardadoSilencioso(servicio, cama);
-    }, 1200); 
+    }, 1200);
 };
 
-window.validarSalidaSegura = function() {
+window.validarSalidaSegura = function () {
     if (!window.datosSincronizados) {
         const confirmar = confirm("⚠️ ALERTA DE SINCRONIZACIÓN\n\nLos últimos cambios aún se están guardando. ¿Desea salir de todos modos?");
         if (!confirmar) return false;
-        window.datosSincronizados = true; 
+        window.datosSincronizados = true;
     }
     return true;
 };
@@ -819,10 +830,10 @@ window.validarSalidaSegura = function() {
 // ============================================================================
 // 5. MOTOR DE AUTOCOMPLETADO INTELIGENTE Y SUGERENCIAS DE DOSIS
 // ============================================================================
-window.generarOpcionesDosisInteligentes = function(nombreMed, viaActual, opcionesBase) {
+window.generarOpcionesDosisInteligentes = function (nombreMed, viaActual, opcionesBase) {
     let opciones = [...opcionesBase];
     const medLow = nombreMed.toLowerCase();
-    
+
     const inhaladores = ["salbutamol", "ipratropio", "budesonida", "formoterol", "fluticasona", "brexotide", "tiotropio", "olodaterol"];
     const esInhalador = inhaladores.some(inh => medLow.includes(inh));
     const esNutricionOSuero = ["fresubin", "ensure", "osmolite", "survimed", "diben", "peptamen", "glucerna", "jevity", "smofkabiven", "smoflipid", "suero", "nacl", "sodio cloruro", "glucosa", "ringer", "sodio bicarbonato 2/3 molar 250 ml"].some(n => medLow.includes(n));
@@ -868,26 +879,26 @@ window.generarOpcionesDosisInteligentes = function(nombreMed, viaActual, opcione
     return opciones;
 };
 
-document.addEventListener("click", function(e) {
+document.addEventListener("click", function (e) {
     if ((e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") && e.target.hasAttribute("data-lista")) {
         e.target.dispatchEvent(new Event("input", { bubbles: true }));
     }
 });
 
-document.addEventListener("input", function(e) {
+document.addEventListener("input", function (e) {
     if ((e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") && e.target.hasAttribute("data-lista") && window.datosGlobales) {
         window.inputActivo = e.target;
         const listaId = window.inputActivo.getAttribute("data-lista");
         const menuFlotante = document.getElementById("menu-flotante");
-        
+
         let opciones = window.datosGlobales[listaId] ? [...window.datosGlobales[listaId]] : [];
         let valor = window.inputActivo.value.toLowerCase();
-        
+
         if (listaId === "alergias") {
             const partes = valor.split(',');
             valor = partes[partes.length - 1].trim();
         }
-        
+
         if (listaId === "dosis") {
             const fila = window.inputActivo.closest("tr") || window.inputActivo.closest(".item-conciliacion-nuevo");
             if (fila) {
@@ -899,7 +910,7 @@ document.addEventListener("input", function(e) {
 
         const valorSinTildes = window.quitarTildes(valor);
         let opcionesFiltradas = opciones.filter(opt => window.quitarTildes(opt.toLowerCase()).includes(valorSinTildes));
-        
+
         opcionesFiltradas.sort((a, b) => {
             const strA = window.quitarTildes(a.toLowerCase());
             const strB = window.quitarTildes(b.toLowerCase());
@@ -916,12 +927,12 @@ document.addEventListener("input", function(e) {
         opcionesFiltradas.forEach((opt, index) => {
             const div = document.createElement("div");
             div.textContent = opt;
-            div.onmousedown = function(ev) { ev.preventDefault(); ev.stopPropagation(); window.seleccionarOpcion(opt); };
-            div.ontouchstart = function(ev) { ev.preventDefault(); ev.stopPropagation(); window.seleccionarOpcion(opt); };
-            div.onmouseover = function() { window.opcionResaltadaIndex = index; window.actualizarResaltado(); };
+            div.onmousedown = function (ev) { ev.preventDefault(); ev.stopPropagation(); window.seleccionarOpcion(opt); };
+            div.ontouchstart = function (ev) { ev.preventDefault(); ev.stopPropagation(); window.seleccionarOpcion(opt); };
+            div.onmouseover = function () { window.opcionResaltadaIndex = index; window.actualizarResaltado(); };
             menuFlotante.appendChild(div);
         });
-        
+
         if (opcionesFiltradas.length > 0) {
             const rect = window.inputActivo.getBoundingClientRect();
             const dentroDeModal = window.inputActivo.closest("#modal-conciliacion");
@@ -967,21 +978,21 @@ document.addEventListener("input", function(e) {
     }
 });
 
-window.seleccionarOpcion = function(texto) { 
+window.seleccionarOpcion = function (texto) {
     const menuFlotante = document.getElementById("menu-flotante");
     if (window.inputActivo.getAttribute("data-lista") === "alergias") {
         let partes = window.inputActivo.value.split(',');
-        partes.pop(); 
-        let nuevaAlergia = partes.length > 0 ? " " + texto : texto; 
+        partes.pop();
+        let nuevaAlergia = partes.length > 0 ? " " + texto : texto;
         window.inputActivo.value = [...partes, nuevaAlergia].join(',') + ", ";
     } else {
-        window.inputActivo.value = texto; 
+        window.inputActivo.value = texto;
     }
-    menuFlotante.style.display = "none"; 
-    window.inputActivo.dispatchEvent(new Event("change", { bubbles: true })); 
+    menuFlotante.style.display = "none";
+    window.inputActivo.dispatchEvent(new Event("change", { bubbles: true }));
 };
 
-window.actualizarResaltado = function() {
+window.actualizarResaltado = function () {
     const menuFlotante = document.getElementById("menu-flotante");
     const items = menuFlotante.querySelectorAll("div");
     items.forEach(item => item.classList.remove("opcion-activa"));
@@ -991,57 +1002,57 @@ window.actualizarResaltado = function() {
     }
 };
 
-document.addEventListener("mousedown", function(e) { 
+document.addEventListener("mousedown", function (e) {
     const menuFlotante = document.getElementById("menu-flotante");
     if (menuFlotante && menuFlotante.style.display === "block" && !menuFlotante.contains(e.target) && e.target !== window.inputActivo) {
-        menuFlotante.style.display = "none"; 
+        menuFlotante.style.display = "none";
     }
 });
-document.addEventListener("focusin", function(e) { 
+document.addEventListener("focusin", function (e) {
     const menuFlotante = document.getElementById("menu-flotante");
     if (window.inputActivo && e.target !== window.inputActivo && menuFlotante) {
-        menuFlotante.style.display = "none"; 
+        menuFlotante.style.display = "none";
     }
 });
 
 // ============================================================================
 // 6. MOTOR MATEMÁTICO DE CÁLCULO DE UNIDADES Y SALDOS MULTIDOSIS
 // ============================================================================
-window.limpiarDecimales = function(texto) {
+window.limpiarDecimales = function (texto) {
     if (!texto) return "";
     let t = texto.toString().trim();
     if (t.includes('.') && t.includes(',')) t = t.replace(/\./g, '');
     return t.replace(/,/g, '.');
 };
 
-window.extraerSoloNumero = function(texto) {
+window.extraerSoloNumero = function (texto) {
     if (!texto) return 0;
     let m = window.limpiarDecimales(texto).match(/(\d+(\.\d+)?)/);
     return m ? parseFloat(m[1]) : 0;
 };
 
-window.obtenerFactorFrecuenciaFront = function(texto) {
+window.obtenerFactorFrecuenciaFront = function (texto) {
     const t = (texto || "").toLowerCase().replace(/\s/g, '').replace(/hrs/g, 'h').replace(/hr/g, 'h');
-    if (t === "carga" || t.includes("porunavez")) return 1; 
+    if (t === "carga" || t.includes("porunavez")) return 1;
     if (t.includes("c/dia") || t.includes("1vez") || t.includes("24h")) return 1;
-    if (t.includes("72h")) return 0.33; 
-    if (t.includes("48h")) return 0.5;  
-    if (t.includes("36h")) return 0.66; 
-    if (t.includes("18h")) return 1.33; 
+    if (t.includes("72h")) return 0.33;
+    if (t.includes("48h")) return 0.5;
+    if (t.includes("36h")) return 0.66;
+    if (t.includes("18h")) return 1.33;
     if (t.includes("12h") || t.includes("2veces")) return 2;
-    if (t.includes("8h")  || t.includes("3veces")) return 3;
-    if (t.includes("6h")  || t.includes("4veces")) return 4;
-    if (t.includes("4h")  || t.includes("6veces")) return 6;
-    if (t.includes("3h")  || t.includes("8veces")) return 8;
-    if (t.includes("2h")  || t.includes("12veces")) return 12;
+    if (t.includes("8h") || t.includes("3veces")) return 3;
+    if (t.includes("6h") || t.includes("4veces")) return 4;
+    if (t.includes("4h") || t.includes("6veces")) return 6;
+    if (t.includes("3h") || t.includes("8veces")) return 8;
+    if (t.includes("2h") || t.includes("12veces")) return 12;
     if (t === "c/h" || t.includes("1h") || t.includes("cadahora")) return 24;
-    return 0; 
+    return 0;
 };
 
-window.extraerSoloMasa = function(texto) {
+window.extraerSoloMasa = function (texto) {
     if (!texto) return 0;
     let t = window.limpiarDecimales(texto).toLowerCase();
-    t = t.replace(/\/\s*\d+([.,]\d+)?\s*(ml|cc)/g, ""); 
+    t = t.replace(/\/\s*\d+([.,]\d+)?\s*(ml|cc)/g, "");
     t = t.replace(/\d+([.,]\d+)?\s*(ml|cc)/g, "");
     let matches = t.match(/(\d+(\.\d+)?)/g);
     if (matches && matches.length >= 2 && t.includes("/")) {
@@ -1051,7 +1062,7 @@ window.extraerSoloMasa = function(texto) {
     return m ? parseFloat(m[1]) : 0;
 };
 
-window.extraerConcentracionPro = function(texto) {
+window.extraerConcentracionPro = function (texto) {
     if (!texto) return 0;
     let m = window.limpiarDecimales(texto).toLowerCase().match(/(\d+(\.\d+)?)\s*(ml|cc)/);
     if (m) return parseFloat(m[1]);
@@ -1059,7 +1070,7 @@ window.extraerConcentracionPro = function(texto) {
     return m2 ? parseFloat(m2[1]) : 0;
 };
 
-window.calcularDosisFila = function(medTexto, viaTexto, dosisTexto, posoTexto, factorDias, rowId = null) {
+window.calcularDosisFila = function (medTexto, viaTexto, dosisTexto, posoTexto, factorDias, rowId = null) {
     medTexto = (medTexto || "").toLowerCase().trim();
     viaTexto = (viaTexto || "").toLowerCase().trim();
     dosisTexto = (dosisTexto || "").toLowerCase().trim();
@@ -1074,7 +1085,7 @@ window.calcularDosisFila = function(medTexto, viaTexto, dosisTexto, posoTexto, f
             const srv = (document.getElementById("servicio").value || "").toLowerCase();
             if (!(prot.especialidad === "Psiquiatría" && srv === "uce")) {
                 const estado = window.medicamentosPendientes[`${rowId}|${medTexto}`]?.estado;
-                if (estado && estado !== "ACEPTADO") return ""; 
+                if (estado && estado !== "ACEPTADO") return "";
             }
         }
     }
@@ -1095,7 +1106,7 @@ window.calcularDosisFila = function(medTexto, viaTexto, dosisTexto, posoTexto, f
             const mcgTotalesPeriodo = dosis * peso * 60 * 24 * factorDias;
             return Math.ceil(mcgTotalesPeriodo / concentracionAmpMcg);
         }
-    } 
+    }
     else if (medTexto.includes("ui") || medTexto.includes("unidades")) {
         let divisor = window.extraerSoloMasa(medTexto);
         if (divisor > 0) {
@@ -1104,20 +1115,20 @@ window.calcularDosisFila = function(medTexto, viaTexto, dosisTexto, posoTexto, f
         }
     }
     else if (["fresubin", "ensure", "osmolite", "survimed", "diben", "peptamen", "glucerna"].some(n => medTexto.includes(n)) ||
-             posoTexto === "c/h" || posoTexto.includes("ml/h") || posoTexto.includes("cc/h") || posoTexto.includes("gotas/min") ||
-             (posoTexto.includes("24h") && (dosisTexto.includes("cc") || dosisTexto.includes("ml")))) {
-        
+        posoTexto === "c/h" || posoTexto.includes("ml/h") || posoTexto.includes("cc/h") || posoTexto.includes("gotas/min") ||
+        (posoTexto.includes("24h") && (dosisTexto.includes("cc") || dosisTexto.includes("ml")))) {
+
         const esNutricion = ["fresubin", "ensure", "osmolite", "survimed", "diben", "peptamen", "glucerna"].some(n => medTexto.includes(n));
         if ((dosisTexto.includes("mg") || dosisTexto.includes("mcg") || dosisTexto.includes("g") || dosisTexto.includes("ui")) && !esNutricion) {
             const concentracionMasa = window.extraerSoloMasa(medTexto);
             if (concentracionMasa > 0) resultado = Math.ceil((dosis * 24 * factorDias) / concentracionMasa);
         } else {
-            const concentracionVol = window.extraerConcentracionPro(medTexto); 
+            const concentracionVol = window.extraerConcentracionPro(medTexto);
             let volumenDiarioML = (factor === 24 || posoTexto.includes("h")) ? (dosis * 24) : (dosis * factor);
             if (concentracionVol > 0) {
                 if (esNutricion) {
                     let frascosPorDia = Math.ceil(volumenDiarioML / concentracionVol) || 1;
-                    resultado = frascosPorDia * factorDias; 
+                    resultado = frascosPorDia * factorDias;
                 } else {
                     resultado = Math.ceil((volumenDiarioML * factorDias) / concentracionVol);
                 }
@@ -1131,7 +1142,7 @@ window.calcularDosisFila = function(medTexto, viaTexto, dosisTexto, posoTexto, f
         resultado = 1;
     }
     else {
-        const concentracionMasa = window.extraerSoloMasa(medTexto); 
+        const concentracionMasa = window.extraerSoloMasa(medTexto);
         const esLiquido = ["jarabe", "suspension", "gotas"].some(l => medTexto.includes(l));
         const esInyectable = viaTexto.includes("ev") || viaTexto.includes("im") || viaTexto.includes("sc") || viaTexto.includes("iv");
         const esFrasco = ["ceftriaxona", "cloxacilina", "vancomicina", "piperacilina", "meropenem", "ampicilina", "penicilina", "cefazolina", "cefotaxima", "ceftazidima", "hidrocortisona", "omeprazol 40 mg", "anidulafungina", "amfotericina b", "vial", "frasco", "fa", "heparina"].some(f => medTexto.includes(f));
@@ -1141,16 +1152,16 @@ window.calcularDosisFila = function(medTexto, viaTexto, dosisTexto, posoTexto, f
 
         if (esLiquido && !esAmpolla) {
             let volumenDosisML = dosis;
-            if (!dosisEsML && concentracionMasa > 0) volumenDosisML = (dosis * 1) / concentracionMasa; 
+            if (!dosisEsML && concentracionMasa > 0) volumenDosisML = (dosis * 1) / concentracionMasa;
             let capacidadFrasco = medTexto.includes("valproico") ? 120 : 100;
             resultado = Math.ceil((volumenDosisML * factor * factorDias) / capacidadFrasco) || 1;
-        } 
+        }
         else if (esAmpolla || esCapsula) {
             if (concentracionMasa > 0) {
                 let volumenAmpolla = window.extraerConcentracionPro(medTexto) || 1;
                 let unidadesPorDosis = dosisEsML ? (dosis / volumenAmpolla) : (dosis / concentracionMasa);
                 let factorCalculo = factor < 1 ? 1 : factor; 
-                resultado = Math.ceil(unidadesPorDosis) * factorCalculo * factorDias;
+                resultado = Math.ceil(Math.ceil(unidadesPorDosis) * factorCalculo * factorDias);
             }
         }
         else {
@@ -1163,19 +1174,29 @@ window.calcularDosisFila = function(medTexto, viaTexto, dosisTexto, posoTexto, f
     return resultado || "";
 };
 
-window.actualizarSaldosYSidebar = function() {
+// Función maestra que devuelve el factor de despacho (Días o Fracción de Horas para Turno 24h)
+window.obtenerFactorDespachoActivo = function () {
+    const selectHoras = document.getElementById("selectHorasDespacho");
+    const horas = selectHoras ? parseFloat(selectHoras.value) || 24 : 24;
+    if (horas < 24) {
+        return horas / 24; // 12h = 0.5 | 8h = 0.3333 | 6h = 0.25
+    }
+    return parseInt(document.getElementById("inputDias")?.value) || 1;
+};
+
+window.actualizarSaldosYSidebar = function () {
     const filas = document.querySelectorAll("#grillaFila tr");
-    const diasADespachar = parseInt(document.getElementById("inputDias").value) || 1;
+    const diasADespachar = window.obtenerFactorDespachoActivo();
     const contenedorSaldos = document.getElementById("sidebar-saldos-content");
     if (!contenedorSaldos) return;
-    
+
     let colActiva = 0;
     const headersF = document.querySelectorAll(".header-fecha");
     for (let i = 0; i < 10; i++) {
         if (headersF[i].value.trim() !== "") colActiva = i;
     }
     let limiteColumnas = colActiva + 1;
-    
+
     let rut = document.getElementById("rut").value.trim();
     if (!rut) {
         const serv = document.getElementById("servicio").value || "sin_servicio";
@@ -1185,7 +1206,7 @@ window.actualizarSaldosYSidebar = function() {
 
     let saldosGuardados = JSON.parse(localStorage.getItem("saldos_" + rut)) || {};
     window.nuevosSaldosParaManana = {};
-    
+
     let htmlSaldos = ""; let haySaldos = false;
 
     const diccMultidosis = [
@@ -1221,11 +1242,11 @@ window.actualizarSaldosYSidebar = function() {
         const dosisTexto = inputs[2].value.trim().toLowerCase();
         const posoTexto = inputs[3].value.trim().toLowerCase();
         if (!medNombre || !dosisTexto || !posoTexto) return;
-        
+
         const multiData = diccMultidosis.find(m => medNombre.includes(m.clave));
         const esNutricion = diccNutriciones.some(n => medNombre.includes(n));
         const esSuero = diccSueros.some(s => medNombre.includes(s));
-        
+
         let liqData = null; let liqName = "";
         let medLimpio = window.quitarTildes(medNombre);
         for (let key in DB_LIQUIDOS) {
@@ -1237,24 +1258,28 @@ window.actualizarSaldosYSidebar = function() {
         if (multiData) {
             let dosisNum = parseFloat(dosisTexto.match(/(\d+(\.\d+)?)/)?.[1]) || 0;
             let esOftalmico = ["cloramfenicol", "lagrima", "lágrima", "pilocarpina", "proparacaina", "proparacaína", "dorzolamida", "latanoprost", "tobramicina"].some(o => medNombre.includes(o));
-            if (esOftalmico) dosisNum = dosisNum * 2; 
-            else if (dosisTexto.includes("gota")) dosisNum = dosisNum / 20; 
-            
+            if (esOftalmico) dosisNum = dosisNum * 2;
+            else if (dosisTexto.includes("gota")) dosisNum = dosisNum / 20;
+
             const factor = window.obtenerFactorFrecuenciaFront(posoTexto);
             const dosisDiaria = dosisNum * factor;
             const consumoTotal = dosisDiaria * diasADespachar;
-            
+
             if (consumoTotal > 0) {
                 haySaldos = true;
                 let saldoPrevio = saldosGuardados[multiData.clave] !== undefined ? saldosGuardados[multiData.clave] : 0;
                 let balanceActual = saldoPrevio;
                 let diasDuracionUnFrasco = Math.floor(multiData.capacidad / dosisDiaria);
-                
+
                 for (let d = colActiva; d < limiteColumnas; d++) {
                     if (d > 9) break;
-                    let celdaDia = inputs[5 + d]; 
-                    if (!celdaDia) break; 
-                    if (celdaDia.dataset.manual === "true") { balanceActual -= consumoTotal; continue; }
+                    let celdaDia = inputs[5 + d];
+                    if (!celdaDia) break;
+                    if (celdaDia.dataset.manual === "true") {
+                        const valMan = celdaDia.value.trim().toUpperCase();
+                        if (valMan !== "" && valMan !== "S/I" && valMan !== "-") balanceActual -= consumoTotal;
+                        continue;
+                    }
 
                     if (balanceActual < consumoTotal) {
                         let faltante = consumoTotal - balanceActual;
@@ -1284,19 +1309,19 @@ window.actualizarSaldosYSidebar = function() {
                     </div>
                     <div style="margin-top: 10px; display:flex; justify-content:space-between; align-items:flex-end;">
                         <div>
-                            <span class="nutricion-vol" style="color:var(--text-muted);">Gasto Diario: ${Math.round(dosisDiaria*10)/10} ${multiData.unidad}</span>
+                            <span class="nutricion-vol" style="color:var(--text-muted);">Gasto Diario: ${Math.round(dosisDiaria * 10) / 10} ${multiData.unidad}</span>
                             <span class="nutricion-vol" style="color:var(--accent-green); font-weight:bold; margin-top:3px; font-size: 13px;">Queda para mañana: ${Math.round(balanceActual)} ${multiData.unidad}</span>
                         </div>
                         <span style="font-size:10px; font-weight:bold; color:var(--accent-blue); text-align:right;">1 envase dura<br><b style="font-size:16px;">${diasDuracionUnFrasco}</b> días</span>
                     </div>
                   </div>`;
             }
-        } 
+        }
         else if (liqData && !liqData.biogaia) {
             let dosisML = parseFloat(dosisTexto.match(/(\d+(\.\d+)?)/)?.[1]) || 0;
             if (dosisTexto.includes("mg") || dosisTexto.includes("ui")) dosisML = (dosisML * liqData.ml) / liqData.mg;
             else if (dosisTexto.includes("gota")) dosisML = dosisML / 20;
-            
+
             const factor = window.obtenerFactorFrecuenciaFront(posoTexto);
             const consumoDiario = dosisML * factor;
             const consumoTotal = consumoDiario * diasADespachar;
@@ -1311,7 +1336,11 @@ window.actualizarSaldosYSidebar = function() {
                     if (d > 9) break;
                     let celdaDia = inputs[5 + d];
                     if (!celdaDia) break;
-                    if (celdaDia.dataset.manual === "true") { balanceActual -= consumoTotal; continue; }
+                    if (celdaDia.dataset.manual === "true") {
+                        const valMan = celdaDia.value.trim().toUpperCase();
+                        if (valMan !== "" && valMan !== "S/I" && valMan !== "-") balanceActual -= consumoTotal;
+                        continue;
+                    }
 
                     if (balanceActual < consumoTotal) {
                         let faltante = consumoTotal - balanceActual;
@@ -1321,7 +1350,7 @@ window.actualizarSaldosYSidebar = function() {
                         balanceActual += (frascos * liqData.total);
                     } else {
                         celdaDia.value = "T";
-                        celdaDia.style.color = "#0277bd"; 
+                        celdaDia.style.color = "#0277bd";
                     }
                     celdaDia.style.fontWeight = "900";
                     balanceActual -= consumoTotal;
@@ -1341,7 +1370,7 @@ window.actualizarSaldosYSidebar = function() {
                     </div>
                     <div style="margin-top: 10px; display:flex; justify-content:space-between; align-items:flex-end;">
                         <div>
-                            <span class="nutricion-vol" style="color:var(--text-muted);">Gasto: ${Math.round(consumoDiario*10)/10} mL / día</span>
+                            <span class="nutricion-vol" style="color:var(--text-muted);">Gasto: ${Math.round(consumoDiario * 10) / 10} mL / día</span>
                             <span class="nutricion-vol" style="color:#0277bd; font-weight:bold; margin-top:3px; font-size: 13px;">Queda para mañana: ${Math.round(balanceActual)} mL</span>
                         </div>
                         <span style="font-size:10px; font-weight:bold; color:var(--text-muted); text-align:right;">1 frasco (${liqData.total} mL) dura<br><b style="font-size:16px; color:var(--accent-blue);">${diasDuracionUnFrasco}</b> días</span>
@@ -1359,9 +1388,9 @@ window.actualizarSaldosYSidebar = function() {
             let capMatraz = 1000;
             let capRegex = medNombre.match(/(1000|500|250|100|20|5)\s*(ml|cc)/i);
             if (capRegex) capMatraz = parseInt(capRegex[1]);
-            else if (medNombre.includes("2200")) capMatraz = 2053; 
-            else if (medNombre.includes("1800")) capMatraz = 1500; 
-            else if (medNombre.includes("1300")) capMatraz = 1904; 
+            else if (medNombre.includes("2200")) capMatraz = 2053;
+            else if (medNombre.includes("1800")) capMatraz = 1500;
+            else if (medNombre.includes("1300")) capMatraz = 1904;
 
             if (volumenTotalML > 0) {
                 haySaldos = true;
@@ -1369,10 +1398,10 @@ window.actualizarSaldosYSidebar = function() {
                 let sobranteDiario = (frascosPorDia * capMatraz) - volumenTotalML;
                 let tituloBadge = esNutricion ? "24 HRS HANG TIME" : "INFUSIÓN CONTINUA";
                 let colorBadge = esNutricion ? "#ff9800" : "#40c4ff";
-                
+
                 for (let d = colActiva; d < limiteColumnas; d++) {
                     if (d > 9) break;
-                    let celdaDia = inputs[5 + d]; 
+                    let celdaDia = inputs[5 + d];
                     if (celdaDia && celdaDia.dataset.manual !== "true") {
                         celdaDia.value = frascosPorDia;
                         celdaDia.style.color = "var(--text-main)";
@@ -1403,14 +1432,14 @@ window.actualizarSaldosYSidebar = function() {
     if (haySaldos) {
         contenedorSaldos.innerHTML = htmlSaldos;
         document.querySelectorAll(".input-saldo-manual").forEach(input => {
-            input.addEventListener("change", function() {
+            input.addEventListener("change", function () {
                 const clave = this.getAttribute("data-clave");
                 const val = parseFloat(this.value) || 0;
                 let rutActual = document.getElementById("rut").value.trim() || ((document.getElementById("servicio").value || "sin") + "_" + (document.getElementById("cama").value || "sincama"));
                 let saldos = JSON.parse(localStorage.getItem("saldos_" + rutActual)) || {};
-                saldos[clave] = val; 
+                saldos[clave] = val;
                 localStorage.setItem("saldos_" + rutActual, JSON.stringify(saldos));
-                window.actualizarSaldosYSidebar(); 
+                window.actualizarSaldosYSidebar();
                 window.programarAutoguardado();
             });
         });
@@ -1421,11 +1450,11 @@ window.actualizarSaldosYSidebar = function() {
             Escriba un fármaco multidosis o líquido oral para monitorear sus saldos en tiempo real.
           </div>`;
     }
-    
+
     window.actualizarSidebarPendientes();
 };
 
-window.guardarSaldosParaManana = function() {
+window.guardarSaldosParaManana = function () {
     let rut = document.getElementById("rut").value.trim() || ((document.getElementById("servicio").value || "sin") + "_" + (document.getElementById("cama").value || "sincama"));
     let saldos = JSON.parse(localStorage.getItem("saldos_" + rut)) || {};
     if (window.nuevosSaldosParaManana) {
@@ -1439,7 +1468,7 @@ window.guardarSaldosParaManana = function() {
 // ============================================================================
 window.columnaConciliacionDestino = null;
 
-window.iniciarNuevoDiaWeb = function(colIndex) {
+window.iniciarNuevoDiaWeb = function (colIndex) {
     if (window.isModoHistorico) return;
 
     const headersFecha = document.querySelectorAll(".header-fecha");
@@ -1475,7 +1504,7 @@ window.iniciarNuevoDiaWeb = function(colIndex) {
     window.abrirModalConciliacionDia(colIndex, fechaFormateada);
 };
 
-window.abrirModalConciliacionDia = function(colIndex, fechaFormateada) {
+window.abrirModalConciliacionDia = function (colIndex, fechaFormateada) {
     const modal = document.getElementById("modal-conciliacion");
     const contenedorLista = document.getElementById("lista-farmacos-conciliacion");
     const subtitulo = document.getElementById("subtitulo-conciliacion");
@@ -1494,7 +1523,7 @@ window.abrirModalConciliacionDia = function(colIndex, fechaFormateada) {
     }
 
     const filas = document.querySelectorAll("#grillaFila tr");
-    const diasADespachar = parseInt(document.getElementById("inputDias")?.value) || 1;
+    const diasADespachar = window.obtenerFactorDespachoActivo();
     const servicioActual = (document.getElementById("servicio")?.value || "").toLowerCase();
     const esUciUti = servicioActual === "uci" || servicioActual === "uti";
 
@@ -1557,13 +1586,16 @@ window.abrirModalConciliacionDia = function(colIndex, fechaFormateada) {
         }
 
         // 2. Reglas según tipo de medicamento
+        const ayerFueSI = valorAyer.toUpperCase() === "S/I" || valorAyer === "-";
+        const calculoBase = window.calcularDosisFila(medRaw, viaTexto, dosisTexto, posoTexto, diasADespachar, rowId);
+
         if (!notaClinica) {
             if (esCarga) {
-                sugerenciaHoy = "";
+                sugerenciaHoy = calculoBase || "1";
                 iniciarOmitido = true;
                 notaClinica = "Dosis única de carga";
             } else if (esPomada) {
-                sugerenciaHoy = "";
+                sugerenciaHoy = "1";
                 iniciarOmitido = true;
                 notaClinica = "Tópico / Pomada (según requerimiento)";
             } else if (es48h || es72h) {
@@ -1573,7 +1605,7 @@ window.abrirModalConciliacionDia = function(colIndex, fechaFormateada) {
                     let val = inputs[5 + i].value.replace("✓", "").trim();
                     diasDesdeUltimaDosis++;
                     let num = parseFloat(val);
-                    if (val !== "" && !isNaN(num) && num > 0) {
+                    if (val !== "" && val.toUpperCase() !== "S/I" && !isNaN(num) && num > 0) {
                         ultimaDosisValor = val;
                         break;
                     }
@@ -1585,20 +1617,26 @@ window.abrirModalConciliacionDia = function(colIndex, fechaFormateada) {
                     sugerenciaHoy = ultimaDosisValor;
                     notaClinica = "Corresponde hoy (c/72h)";
                 } else {
-                    sugerenciaHoy = "";
+                    sugerenciaHoy = ultimaDosisValor || calculoBase || "1";
                     iniciarOmitido = true;
                     notaClinica = `No corresponde hoy (${posoTexto})`;
                 }
             } else if (esEspecial) {
-                sugerenciaHoy = valorAyer !== "" ? valorAyer : (window.calcularDosisFila(medRaw, viaTexto, dosisTexto, posoTexto, diasADespachar, rowId) || "T");
-                notaClinica = "Multidosis / Control de saldo";
+                if (ayerFueSI) {
+                    sugerenciaHoy = calculoBase || "T";
+                    iniciarOmitido = true;
+                    notaClinica = "Sin indicación ayer (S/I)";
+                } else {
+                    sugerenciaHoy = valorAyer !== "" ? valorAyer : (calculoBase || "T");
+                    notaClinica = "Multidosis / Control de saldo";
+                }
             } else {
-                if (valorAyer !== "") {
+                if (valorAyer !== "" && !ayerFueSI) {
                     sugerenciaHoy = valorAyer;
                 } else {
-                    sugerenciaHoy = window.calcularDosisFila(medRaw, viaTexto, dosisTexto, posoTexto, diasADespachar, rowId);
+                    sugerenciaHoy = calculoBase || "1";
                     iniciarOmitido = true;
-                    notaClinica = "Sin despacho ayer";
+                    notaClinica = ayerFueSI ? "Sin indicación ayer (S/I)" : "Sin despacho ayer";
                 }
             }
         }
@@ -1620,7 +1658,7 @@ window.abrirModalConciliacionDia = function(colIndex, fechaFormateada) {
                 ${valorAyer !== "" ? valorAyer : "—"}
             </div>
             <div>
-                <input type="text" class="input-hoy-concil" value="${iniciarOmitido ? "" : sugerenciaHoy}" placeholder="—" ${iniciarOmitido ? "disabled" : ""} autocomplete="off">
+                <input type="text" class="input-hoy-concil" value="${iniciarOmitido ? "S/I" : sugerenciaHoy}" placeholder="S/I" ${iniciarOmitido ? "disabled" : ""} autocomplete="off">
             </div>
             <div style="text-align: center;">
                 <button type="button" class="btn-toggle-estado-concil ${iniciarOmitido ? "modo-reactivar" : ""}" onclick="window.toggleEstadoFilaConciliacion(this)">
@@ -1643,7 +1681,7 @@ window.abrirModalConciliacionDia = function(colIndex, fechaFormateada) {
     modal.style.display = "flex";
     setTimeout(() => {
         modal.classList.add("show");
-        contenedorLista.scrollTop = 0; // Asegura que siempre empiece mostrando desde el primer medicamento arriba
+        contenedorLista.scrollTop = 0;
         const primerInputHabilitado = contenedorLista.querySelector(".input-hoy-concil:not(:disabled)");
         if (primerInputHabilitado) {
             primerInputHabilitado.focus({ preventScroll: true });
@@ -1652,9 +1690,8 @@ window.abrirModalConciliacionDia = function(colIndex, fechaFormateada) {
     }, 15);
 };
 
-window.toggleTodosConciliacion = function() {
+window.toggleTodosConciliacion = function () {
     const items = document.querySelectorAll("#lista-farmacos-conciliacion .item-conciliacion");
-    // Si hay alguno activo, los marcamos todos sin indicación; si todos están omitidos, los reactivamos todos
     const hayAlgunoActivo = Array.from(items).some(item => !item.classList.contains("estado-omitido"));
     items.forEach(item => {
         const btn = item.querySelector(".btn-toggle-estado-concil");
@@ -1667,7 +1704,7 @@ window.toggleTodosConciliacion = function() {
     });
 };
 
-window.toggleEstadoFilaConciliacion = function(btn) {
+window.toggleEstadoFilaConciliacion = function (btn) {
     const filaItem = btn.closest(".item-conciliacion");
     const inputHoy = filaItem.querySelector(".input-hoy-concil");
     const estaOmitido = filaItem.classList.contains("estado-omitido");
@@ -1681,14 +1718,14 @@ window.toggleEstadoFilaConciliacion = function(btn) {
         btn.classList.remove("modo-reactivar");
     } else {
         filaItem.classList.add("estado-omitido");
-        inputHoy.value = "";
+        inputHoy.value = "S/I";
         inputHoy.disabled = true;
         btn.textContent = "REACTIVAR";
         btn.classList.add("modo-reactivar");
     }
 };
 
-window.cerrarModalConciliacion = function() {
+window.cerrarModalConciliacion = function () {
     const modal = document.getElementById("modal-conciliacion");
     if (!modal) return;
     modal.classList.remove("show");
@@ -1698,11 +1735,10 @@ window.cerrarModalConciliacion = function() {
     }, 250);
 };
 
-window.agregarFilaNuevaConciliacion = function() {
+window.agregarFilaNuevaConciliacion = function () {
     const contenedorLista = document.getElementById("lista-farmacos-conciliacion");
     if (!contenedorLista) return;
 
-    // Si estaba el mensaje de "No hay medicamentos", limpiarlo
     if (contenedorLista.querySelector(".material-icons-round")) {
         const tieneItems = contenedorLista.querySelector(".item-conciliacion, .item-conciliacion-nuevo");
         if (!tieneItems) contenedorLista.innerHTML = "";
@@ -1712,12 +1748,12 @@ window.agregarFilaNuevaConciliacion = function() {
     divNuevo.className = "item-conciliacion-nuevo";
     divNuevo.innerHTML = `
         <div class="grid-inputs-nuevo-concil">
-            <input type="text" class="input-nuevo-concil inp-nuevo-med" data-lista="nombres" placeholder="Buscar medicamento..." autocomplete="off">
-            <input type="text" class="input-nuevo-concil inp-nuevo-via" data-lista="vias" placeholder="Vía" autocomplete="off" style="text-align:center;">
-            <input type="text" class="input-nuevo-concil inp-nuevo-dosis" data-lista="dosis" placeholder="Dosis" autocomplete="off" style="text-align:center;">
-            <input type="text" class="input-nuevo-concil inp-nuevo-poso" data-lista="posologias" placeholder="Posol." autocomplete="off" style="text-align:center;">
+            <input type="text" class="input-nuevo-concil inp-nuevo-med" data-lista="nombres" placeholder="🔍 Escriba el nombre completo del nuevo medicamento..." autocomplete="off">
+            <input type="text" class="input-nuevo-concil inp-nuevo-via" data-lista="vias" placeholder="Vía (Ej: EV, O)" autocomplete="off" style="text-align:center;">
+            <input type="text" class="input-nuevo-concil inp-nuevo-dosis" data-lista="dosis" placeholder="Dosis (Ej: 1 g)" autocomplete="off" style="text-align:center;">
+            <input type="text" class="input-nuevo-concil inp-nuevo-poso" data-lista="posologias" placeholder="Posol. (Ej: c/8h)" autocomplete="off" style="text-align:center;">
         </div>
-        <div class="badge-ayer-concil" style="color: var(--accent-blue); font-size: 10px; letter-spacing: 0.5px;">
+        <div class="badge-ayer-concil" style="color: var(--accent-blue); font-size: 11px; letter-spacing: 0.5px;">
             NUEVO
         </div>
         <div>
@@ -1730,7 +1766,6 @@ window.agregarFilaNuevaConciliacion = function() {
         </div>
     `;
 
-    // Autocalcular la cantidad de unidades para HOY cuando completan Fármaco, Dosis o Posología
     const inpMed = divNuevo.querySelector(".inp-nuevo-med");
     const inpVia = divNuevo.querySelector(".inp-nuevo-via");
     const inpDosis = divNuevo.querySelector(".inp-nuevo-dosis");
@@ -1738,7 +1773,6 @@ window.agregarFilaNuevaConciliacion = function() {
     const inpHoy = divNuevo.querySelector(".input-hoy-concil");
 
     const recalcularSugerenciaNuevo = () => {
-        // Si escriben solo un número en posología (ej: "8"), agregarle "h" -> "8h"
         let posoVal = inpPoso.value.trim();
         if (/^\d+$/.test(posoVal)) {
             posoVal += "h";
@@ -1749,7 +1783,7 @@ window.agregarFilaNuevaConciliacion = function() {
         const dosisVal = inpDosis.value.trim();
 
         if (medVal && posoVal) {
-            const diasADespachar = parseInt(document.getElementById("inputDias")?.value) || 1;
+            const diasADespachar = window.obtenerFactorDespachoActivo();
             const calculado = window.calcularDosisFila(medVal, viaVal, dosisVal, posoVal, diasADespachar, null);
             if (calculado !== "" && !inpHoy.dataset.editadoManual) {
                 inpHoy.value = calculado;
@@ -1771,7 +1805,7 @@ window.agregarFilaNuevaConciliacion = function() {
     setTimeout(() => inpMed.focus(), 30);
 };
 
-window.confirmarConciliacionDia = function() {
+window.confirmarConciliacionDia = function () {
     const colIndex = window.columnaConciliacionDestino;
     if (colIndex === null || colIndex === undefined) return;
 
@@ -1803,8 +1837,11 @@ window.confirmarConciliacionDia = function() {
         const inputHoyReal = inputs[5 + colIndex];
         if (!inputHoyReal) return;
 
-        if (estaOmitido || valorElegido === "") {
-            inputHoyReal.value = "";
+        if (estaOmitido || valorElegido === "" || valorElegido.toUpperCase() === "S/I") {
+            // Estampar "S/I" claramente en la grilla y bloquear contra sobreescritura automática
+            inputHoyReal.value = "S/I";
+            inputHoyReal.style.color = "var(--accent-red)";
+            inputHoyReal.style.fontWeight = "800";
             inputHoyReal.dataset.omitidoConciliacion = "true";
             inputHoyReal.dataset.manual = "true";
             window.syncCheckUI(inputHoyReal);
@@ -1838,9 +1875,8 @@ window.confirmarConciliacionDia = function() {
         const posoVal = itemNuevo.querySelector(".inp-nuevo-poso").value.trim();
         const cantHoyVal = itemNuevo.querySelector(".input-hoy-concil").value.trim();
 
-        if (!medVal) return; // Ignorar si dejaron el nombre vacío
+        if (!medVal) return;
 
-        // Buscar la primera fila libre en la tabla principal
         const filaLibre = filasGrilla.find(f => f.querySelectorAll("input")[0].value.trim() === "");
         if (!filaLibre) return;
 
@@ -1850,20 +1886,19 @@ window.confirmarConciliacionDia = function() {
         inputs[2].value = dosisVal;
         inputs[3].value = posoVal;
 
-        // Asegurar que los días anteriores al día actual queden vacíos y bloqueados como sin indicación previa
+        // Días previos al inicio de este nuevo tratamiento quedan con "-" bloqueado
         for (let d = 0; d < colIndex; d++) {
             if (inputs[5 + d]) {
-                inputs[5 + d].value = "";
+                inputs[5 + d].value = "-";
+                inputs[5 + d].style.color = "var(--text-muted)";
                 inputs[5 + d].dataset.omitidoConciliacion = "true";
                 inputs[5 + d].dataset.manual = "true";
                 window.syncCheckUI(inputs[5 + d]);
             }
         }
 
-        // Disparar validación y deducción en la fila para que corra CDSS (sobredosis, alergias, interacciones, restringidos)
         inputs[3].dispatchEvent(new Event("change", { bubbles: true }));
 
-        // Si el usuario escribió o confirmó una cantidad específica en el modal para hoy, respetarla
         if (cantHoyVal !== "" && inputs[5 + colIndex]) {
             inputs[5 + colIndex].value = cantHoyVal;
             inputs[5 + colIndex].style.color = "var(--text-main)";
@@ -1893,7 +1928,7 @@ window.confirmarConciliacionDia = function() {
 };
 
 // Navegación rápida con Enter y Escape dentro del Modal de Conciliación
-document.addEventListener("keydown", function(e) {
+document.addEventListener("keydown", function (e) {
     const modalConcil = document.getElementById("modal-conciliacion");
     if (!modalConcil || !modalConcil.classList.contains("show")) return;
 
@@ -1932,7 +1967,7 @@ document.addEventListener("keydown", function(e) {
 // ============================================================================
 // 8. ESCÁNERES CLÍNICOS CDSS (SOBREDOSIS, ALERGIAS, INTERACCIONES, RESTRINGIDOS)
 // ============================================================================
-window.evaluarCDSSLocal = function(fila, medTexto, posoTexto, totalDiarioUnidades, dosisTexto, silencioso = false) {
+window.evaluarCDSSLocal = function (fila, medTexto, posoTexto, totalDiarioUnidades, dosisTexto, silencioso = false) {
     const celdaResultado = fila.querySelectorAll("input")[4];
     const contenedorAlerta = fila.querySelector(".mensaje-reaccion");
     const rowId = fila.dataset.row;
@@ -1972,17 +2007,17 @@ window.evaluarCDSSLocal = function(fila, medTexto, posoTexto, totalDiarioUnidade
                 celdaResultado.value = "⚠️ SOBREDOSIS";
                 if (contenedorAlerta) {
                     contenedorAlerta.innerHTML = "⚠️ ALERTA: " + dataCDSS.alertaSobredosis;
-                    contenedorAlerta.style.background = "#ff5252"; 
+                    contenedorAlerta.style.background = "#ff5252";
                     contenedorAlerta.style.display = "block";
                 }
-                
+
                 if (!silencioso && !window.alertasEmitidas.has(firmaSD)) {
                     window.alertasEmitidas.add(firmaSD);
                     window.tipoAlertaActual = "SOBREDOSIS";
                     window.filaAlertaActiva = rowId;
                     window.mostrarModalAlerta(medTexto, dataCDSS.alertaSobredosis);
                 }
-                return; 
+                return;
             } else {
                 window.alertasEmitidas.delete(firmaSD);
             }
@@ -1992,10 +2027,10 @@ window.evaluarCDSSLocal = function(fila, medTexto, posoTexto, totalDiarioUnidade
     celdaResultado.style.color = "var(--accent-green)";
 };
 
-window.escanearAlergias = function() {
+window.escanearAlergias = function () {
     const inputAlergia = document.getElementById("alergiaPaciente");
     if (!inputAlergia) return;
-    
+
     const alergiaValRaw = inputAlergia.value.trim().toLowerCase();
     const listaAlergias = alergiaValRaw.split(/,|\s+y\s+|-/)
         .map(a => window.quitarTildes(a.trim()))
@@ -2015,7 +2050,7 @@ window.escanearAlergias = function() {
         const celdaResultado = fila.querySelectorAll("input")[4];
         const contenedorAlerta = fila.querySelector(".mensaje-reaccion");
         if (!inputNombre || !celdaResultado || !inputNombre.value.trim()) return;
-        
+
         const nombreMed = window.quitarTildes(inputNombre.value.trim().toLowerCase());
         const firmaAlergia = `${fila.dataset.row}|ALERGIA|${nombreMed}`;
         if (celdaResultado.value.includes("✅ AUTORIZADO")) return;
@@ -2042,10 +2077,10 @@ window.escanearAlergias = function() {
         }
 
         if (alergiaDetectada) {
-            celdaResultado.classList.add("alerta-alergia", "alerta-sobredosis"); 
+            celdaResultado.classList.add("alerta-alergia", "alerta-sobredosis");
             celdaResultado.value = "⚠️ ALERGIA";
             celdaResultado.style.color = "#ff5252";
-            
+
             let msgAlerta = esCruceFamiliar ? `<b>ALERGIA CRUZADA:</b> Familia ${alergiaDetectada.toUpperCase()}` : `<b>ALERGIA DEL PACIENTE:</b> ${alergiaDetectada.toUpperCase()}`;
             if (contenedorAlerta) {
                 contenedorAlerta.innerHTML = msgAlerta;
@@ -2069,11 +2104,11 @@ window.escanearAlergias = function() {
     });
 };
 
-window.escanearInteraccionesGlobales = function() {
+window.escanearInteraccionesGlobales = function () {
     if (!window.datosGlobales || !window.datosGlobales.matrizInteracciones) return;
     const filas = document.querySelectorAll("#grillaFila tr");
     let medsEnGrilla = [];
-    
+
     filas.forEach(fila => {
         const inputNombre = fila.querySelector('input[data-lista="nombres"]');
         const nombreMed = inputNombre.value.trim().toUpperCase();
@@ -2092,7 +2127,7 @@ window.escanearInteraccionesGlobales = function() {
             const firmaCruce = [m1.nombreCompleto, m2.nombreCompleto].sort().join("|");
             if (window.interaccionesValidadas.has(firmaCruce)) continue;
 
-            const alerta = matriz.find(int => 
+            const alerta = matriz.find(int =>
                 (m1.nombreCompleto.includes((int.medA || "").toUpperCase()) && m2.nombreCompleto.includes((int.medB || "").toUpperCase())) ||
                 (m1.nombreCompleto.includes((int.medB || "").toUpperCase()) && m2.nombreCompleto.includes((int.medA || "").toUpperCase()))
             );
@@ -2107,10 +2142,10 @@ window.escanearInteraccionesGlobales = function() {
                 if (!m2.celdaAlerta.value.includes("CRUCE")) m2.celdaAlerta.value = "⚠️ CRUCE";
                 m2.celdaAlerta.nextElementSibling.innerHTML = `<b>CRUCE:</b> ${alerta.medA} + ${alerta.medB}`;
                 m2.celdaAlerta.nextElementSibling.style.background = "#ff9800";
-                
+
                 if (!window.isCargandoPerfil && !modalAbierto && !window.alertasEmitidas.has(firmaCruce) && !document.getElementById("modal-overlay").classList.contains("show")) {
                     window.alertasEmitidas.add(firmaCruce);
-                    window.tipoAlertaActual = "INTERACCION"; 
+                    window.tipoAlertaActual = "INTERACCION";
                     window.datosInteraccionActiva = { m1, m2, alerta };
                     window.mostrarModalInteraccion(alerta);
                     modalAbierto = true;
@@ -2120,12 +2155,12 @@ window.escanearInteraccionesGlobales = function() {
     }
 };
 
-window.escanearRestringidos = function() {
+window.escanearRestringidos = function () {
     const filas = document.querySelectorAll("#grillaFila tr");
-    const firmasActivas = new Set(); 
+    const firmasActivas = new Set();
     const servicioActual = (document.getElementById("servicio").value || "").toLowerCase();
     const esUciUti = servicioActual === "uci" || servicioActual === "uti";
-    
+
     const diagnosticoTexto = (document.getElementById("diagnostico").value || "").toLowerCase();
     const esPacienteOncologico = /\b(ca|cáncer|cancer|oncologia|oncología)\b/.test(diagnosticoTexto);
     const esFallaRenal = /\b(falla renal|insuficiencia renal|irc|ira|enfermedad renal)\b/i.test(diagnosticoTexto);
@@ -2150,12 +2185,12 @@ window.escanearRestringidos = function() {
             if (!(PROTOCOLOS_RESTRINGIDOS[keyEncontrada].especialidad === "Psiquiatría" && servicioActual === "uce")) {
                 protocolo = PROTOCOLOS_RESTRINGIDOS[keyEncontrada];
             }
-        } 
+        }
         else if (esUciUti && (nombreMed.includes("albumina") || nombreMed.includes("albúmina"))) {
             let diasPrescritos = 0;
             for (let d = 0; d < 10; d++) { if (inputs[5 + d].value.trim() !== "") diasPrescritos++; }
             let estaEnMemoria = window.medicamentosPendientes[firmaRestringido]?.tipo === "ALBUMINA";
-            if (diasPrescritos > 3 || estaEnMemoria) { 
+            if (diasPrescritos > 3 || estaEnMemoria) {
                 protocolo = { especialidad: "UPC (Extensión Día 4+)", medicos: ["Dra. Gil", "Dr. Moscoso", "Dr. Rodríguez"] };
                 tipoRestriccion = "ALBUMINA";
             }
@@ -2204,13 +2239,13 @@ window.escanearRestringidos = function() {
 
             // SI YA ESTÁ ACEPTADO, EVITAR CUALQUIER ALERTA O MODAL
             if (estadoActual === "ACEPTADO") {
-                window.medicamentosPendientes[firmaRestringido] = { 
-                    estado: "ACEPTADO", 
-                    rowId, 
-                    medicamento: nombreMed, 
-                    especialidad: protocolo.especialidad, 
-                    medicos: protocolo.medicos, 
-                    tipo: tipoRestriccion, 
+                window.medicamentosPendientes[firmaRestringido] = {
+                    estado: "ACEPTADO",
+                    rowId,
+                    medicamento: nombreMed,
+                    especialidad: protocolo.especialidad,
+                    medicos: protocolo.medicos,
+                    tipo: tipoRestriccion,
                     diasOC: memoriaOC,
                     medicoAutorizador: medicoAutorizador
                 };
@@ -2226,15 +2261,15 @@ window.escanearRestringidos = function() {
 
             // SI NO ESTÁ ACEPTADO, EVALUAR ESTADOS PENDIENTE O NUEVA ALERTA
             if (!estadoActual || estadoActual === "ESPERANDO_DECISION") {
-                window.medicamentosPendientes[firmaRestringido] = { 
-                    estado: "ESPERANDO_DECISION", 
-                    rowId, 
-                    medicamento: nombreMed, 
-                    especialidad: protocolo.especialidad, 
-                    medicos: protocolo.medicos, 
-                    tipo: tipoRestriccion 
+                window.medicamentosPendientes[firmaRestringido] = {
+                    estado: "ESPERANDO_DECISION",
+                    rowId,
+                    medicamento: nombreMed,
+                    especialidad: protocolo.especialidad,
+                    medicos: protocolo.medicos,
+                    tipo: tipoRestriccion
                 };
-                celdaAlerta.classList.add("alerta-interaccion"); 
+                celdaAlerta.classList.add("alerta-interaccion");
                 if (!celdaAlerta.classList.contains("alerta-sobredosis")) {
                     celdaAlerta.value = tipoRestriccion === "ALBUMINA" ? "⚠️ EXTENSIÓN" : "⚠️ RESTRINGIDO";
                     celdaAlerta.style.color = "#ff9800";
@@ -2254,7 +2289,7 @@ window.escanearRestringidos = function() {
     });
 
     for (let firma in window.medicamentosPendientes) {
-        if (!firmasActivas.has(firma)) delete window.medicamentosPendientes[firma]; 
+        if (!firmasActivas.has(firma)) delete window.medicamentosPendientes[firma];
     }
     let idCamaFallback = ((document.getElementById("servicio").value || "sin") + "_" + (document.getElementById("cama").value || "sincama")).toLowerCase().replace(/\s+/g, '_');
     let rutAct = document.getElementById("rut").value.trim() || idCamaFallback;
@@ -2263,7 +2298,7 @@ window.escanearRestringidos = function() {
     if (requiereActualizarSidebar) window.actualizarSidebarPendientes();
 };
 
-window.actualizarSidebarPendientes = function() {
+window.actualizarSidebarPendientes = function () {
     const contenedor = document.getElementById("sidebar-saldos-content");
     if (!contenedor) return;
     let htmlPendientes = ""; let hayEspeciales = false;
@@ -2283,7 +2318,7 @@ window.actualizarSidebarPendientes = function() {
                 textoFooter = `Orden de Compra: <b>${med.diasOC || 0} días</b> autorizados`;
             }
 
-            let botonAccion = !isAceptado 
+            let botonAccion = !isAceptado
                 ? `<button onclick="mostrarModalRestringido('${firma}')" style="background: #ff9800; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 10px; font-weight: bold; cursor: pointer;">RESOLVER</button>`
                 : `<span class="material-icons-round" style="color:var(--accent-green); font-size:18px;">check_circle</span>`;
 
@@ -2313,7 +2348,7 @@ window.actualizarSidebarPendientes = function() {
 // ============================================================================
 // 9. MODALES DE SEGURIDAD CLÍNICA Y GESTIÓN DE CAMAS
 // ============================================================================
-window.mostrarModalAlerta = function(medicamento, mensaje) {
+window.mostrarModalAlerta = function (medicamento, mensaje) {
     document.getElementById("modal-badge-tipo").textContent = "SOBREDOSIS";
     document.getElementById("modal-badge-tipo").style.background = "var(--accent-red)";
     document.querySelector(".modal-header .material-icons-round").textContent = "report_problem";
@@ -2324,7 +2359,7 @@ window.mostrarModalAlerta = function(medicamento, mensaje) {
     overlay.style.display = "flex"; overlay.offsetHeight; overlay.classList.add("show");
 };
 
-window.mostrarModalAlergia = function(medicamento, alergia, esCruce) {
+window.mostrarModalAlergia = function (medicamento, alergia, esCruce) {
     document.getElementById("modal-badge-tipo").textContent = esCruce ? "ALERGIA CRUZADA" : "ALERGIA DETECTADA";
     document.getElementById("modal-badge-tipo").style.background = "#d93025";
     document.querySelector(".modal-header .material-icons-round").textContent = "dangerous";
@@ -2337,9 +2372,9 @@ window.mostrarModalAlergia = function(medicamento, alergia, esCruce) {
     overlay.style.display = "flex"; overlay.offsetHeight; overlay.classList.add("show");
 };
 
-window.mostrarModalInteraccion = function(alerta) {
+window.mostrarModalInteraccion = function (alerta) {
     document.getElementById("modal-badge-tipo").textContent = "INTERACCIÓN " + (alerta.nivel || "CRÍTICA");
-    document.getElementById("modal-badge-tipo").style.background = "#ff9800"; 
+    document.getElementById("modal-badge-tipo").style.background = "#ff9800";
     document.querySelector(".modal-header .material-icons-round").textContent = "compare_arrows";
     document.querySelector(".modal-header .material-icons-round").style.color = "#ff9800";
     document.getElementById("modal-titulo-principal").textContent = "CRUCE PELIGROSO DETECTADO";
@@ -2348,7 +2383,7 @@ window.mostrarModalInteraccion = function(alerta) {
     overlay.style.display = "flex"; overlay.offsetHeight; overlay.classList.add("show");
 };
 
-window.mostrarModalRestringido = function(firma) {
+window.mostrarModalRestringido = function (firma) {
     const data = window.medicamentosPendientes[firma];
     if (!data) return;
     document.getElementById("modal-badge-tipo").textContent = data.tipo === "ALBUMINA" ? "PROTOCOLO DE EXTENSIÓN" : "USO RESTRINGIDO";
@@ -2389,14 +2424,14 @@ window.mostrarModalRestringido = function(firma) {
     if (!btnPendiente) {
         btnPendiente = document.createElement("button");
         btnPendiente.id = "btn-dejar-pendiente";
-        btnPendiente.className = "btn-entendido modal-btn"; 
+        btnPendiente.className = "btn-entendido modal-btn";
         btnPendiente.style.cssText = "background: rgba(255, 193, 7, 0.15) !important; border: 1px solid #ffc107 !important; color: #ffc107 !important; margin: 0 10px; font-weight: 900;";
         const accionesModal = document.querySelector("#modal-overlay .modal-actions");
         if (accionesModal) accionesModal.insertBefore(btnPendiente, accionesModal.querySelector(".btn-entendido"));
     }
     btnPendiente.textContent = "DEJAR PENDIENTE";
     btnPendiente.style.display = "block";
-    btnPendiente.onclick = function() {
+    btnPendiente.onclick = function () {
         window.medicamentosPendientes[firma].estado = "PENDIENTE";
         window.actualizarSidebarPendientes();
         window.resetearCerrarModal();
@@ -2408,8 +2443,8 @@ window.mostrarModalRestringido = function(firma) {
     overlay.style.display = "flex"; overlay.offsetHeight; overlay.classList.add("show");
 };
 
-window.resetearCerrarModal = function() {
-    const overlay = document.getElementById("modal-overlay"); 
+window.resetearCerrarModal = function () {
+    const overlay = document.getElementById("modal-overlay");
     overlay.classList.remove("show");
     setTimeout(() => { overlay.style.display = "none"; }, 300);
 
@@ -2432,7 +2467,7 @@ window.resetearCerrarModal = function() {
     if (btnPendiente) btnPendiente.style.display = "none";
 };
 
-window.autoCompletarRut = function() {
+window.autoCompletarRut = function () {
     const inputMed = document.getElementById("modal-medNombre");
     if (!inputMed) return;
     const nombre = inputMed.value.toUpperCase();
@@ -2444,7 +2479,7 @@ window.autoCompletarRut = function() {
     }
 };
 
-document.getElementById("btn-aceptar-dosis").onclick = function() {
+document.getElementById("btn-aceptar-dosis").onclick = function () {
     const inputNombre = document.getElementById("modal-medNombre");
     const nombreMed = inputNombre ? inputNombre.value.trim().toUpperCase() : "";
 
@@ -2513,7 +2548,7 @@ document.getElementById("btn-aceptar-dosis").onclick = function() {
 // ============================================================================
 // 10. ESCUCHADOR UNIFICADO DE LA GRILLA (VALIDACIÓN ESTRICTA + DEDUCCIÓN)
 // ============================================================================
-document.getElementById("grillaFila").addEventListener("change", function(e) {
+document.getElementById("grillaFila").addEventListener("change", function (e) {
     const celdaModificada = e.target;
     if (celdaModificada.tagName !== "INPUT") return;
 
@@ -2530,7 +2565,7 @@ document.getElementById("grillaFila").addEventListener("change", function(e) {
         for (let d = 5; d <= 14; d++) { if (inputs[d]) delete inputs[d].dataset.manual; }
     }
 
-    const rowId = fila.dataset.row; 
+    const rowId = fila.dataset.row;
     let valorActual = celdaModificada.value.trim();
     let listId = celdaModificada.getAttribute("data-lista");
 
@@ -2549,13 +2584,13 @@ document.getElementById("grillaFila").addEventListener("change", function(e) {
     }
 
     // Autolimpieza si borran el fármaco
-    const celdaResultado = inputs[4]; 
+    const celdaResultado = inputs[4];
     const contenedorAlerta = fila.querySelector(".mensaje-reaccion");
     if (!inputs[0].value.trim()) {
-        if (inputs[1]) inputs[1].value = ""; 
-        if (inputs[2]) inputs[2].value = ""; 
-        if (inputs[3]) inputs[3].value = ""; 
-        celdaResultado.value = ""; 
+        if (inputs[1]) inputs[1].value = "";
+        if (inputs[2]) inputs[2].value = "";
+        if (inputs[3]) inputs[3].value = "";
+        celdaResultado.value = "";
         celdaResultado.classList.remove("alerta-sobredosis", "alerta-interaccion", "alerta-alergia");
         if (contenedorAlerta) contenedorAlerta.style.display = "none";
         for (let d = 0; d < 10; d++) { if (inputs[5 + d]) { inputs[5 + d].value = ""; window.syncCheckUI(inputs[5 + d]); } }
@@ -2576,17 +2611,17 @@ document.getElementById("grillaFila").addEventListener("change", function(e) {
 
         if (arrayOpciones.length > 0) {
             const valorSinTildes = window.quitarTildes(valorActual.toLowerCase());
-            let coincidencia = arrayOpciones.find(opt => window.quitarTildes(opt.toLowerCase()) === valorSinTildes) || 
-                               arrayOpciones.find(opt => window.quitarTildes(opt.toLowerCase()).startsWith(valorSinTildes)) ||
-                               arrayOpciones.find(opt => window.quitarTildes(opt.toLowerCase()).includes(valorSinTildes));
-            
-            if (coincidencia) { 
-                celdaModificada.value = coincidencia + tagOC; 
+            let coincidencia = arrayOpciones.find(opt => window.quitarTildes(opt.toLowerCase()) === valorSinTildes) ||
+                arrayOpciones.find(opt => window.quitarTildes(opt.toLowerCase()).startsWith(valorSinTildes)) ||
+                arrayOpciones.find(opt => window.quitarTildes(opt.toLowerCase()).includes(valorSinTildes));
+
+            if (coincidencia) {
+                celdaModificada.value = coincidencia + tagOC;
             } else if (listId === "dosis") {
                 let valorLimpio = valorActual.replace(/,/g, '.').trim();
                 if (/^[\d.]+$/.test(valorLimpio)) {
                     const nombreMed = inputs[0].value.toLowerCase();
-                    let unidadDeducida = "mg"; 
+                    let unidadDeducida = "mg";
                     const inhaladores = ["salbutamol", "ipratropio", "budesonida", "formoterol", "fluticasona", "brexotide", "tiotropio", "olodaterol"];
                     const esNutricionOSuero = ["fresubin", "ensure", "osmolite", "survimed", "diben", "peptamen", "glucerna", "jevity", "smofkabiven", "smoflipid", "suero", "nacl", "sodio cloruro", "glucosa", "ringer", "sodio bicarbonato 2/3 molar 250 ml"].some(n => nombreMed.includes(n));
                     let esLiquidoOral = Object.keys(DB_LIQUIDOS).some(k => window.quitarTildes(nombreMed).includes(window.quitarTildes(k.toLowerCase())));
@@ -2611,10 +2646,10 @@ document.getElementById("grillaFila").addEventListener("change", function(e) {
                     celdaModificada.value = (valorLimpio + " " + unidadDeducida).trim();
                 }
             } else {
-                celdaModificada.value = ""; 
-                celdaModificada.style.borderBottom = "2px solid var(--accent-red)"; 
+                celdaModificada.value = "";
+                celdaModificada.style.borderBottom = "2px solid var(--accent-red)";
                 setTimeout(() => celdaModificada.style.borderBottom = "none", 1500);
-                return; 
+                return;
             }
         }
     }
@@ -2629,7 +2664,7 @@ document.getElementById("grillaFila").addEventListener("change", function(e) {
         const headersF = document.querySelectorAll(".header-fecha");
         for (let i = 0; i < 10; i++) { if (headersF[i].value.trim() !== "") colActiva = i; }
 
-        const diasADespachar = parseInt(document.getElementById("inputDias").value) || 1;
+        const diasADespachar = window.obtenerFactorDespachoActivo();
         let totalDiarioUnidades = window.calcularDosisFila(medTexto, viaTexto, dosisTexto, posoTexto, diasADespachar, rowId);
 
         if (totalDiarioUnidades !== "") {
@@ -2644,14 +2679,14 @@ document.getElementById("grillaFila").addEventListener("change", function(e) {
                     window.syncCheckUI(celdaDia);
                 }
             }
-            for (let d = limiteColumnas; d < 10; d++) { 
+            for (let d = limiteColumnas; d < 10; d++) {
                 if (inputs[5 + d] && inputs[5 + d].dataset.manual !== "true") {
-                    inputs[5 + d].value = ""; 
+                    inputs[5 + d].value = "";
                     window.syncCheckUI(inputs[5 + d]);
                 }
             }
         }
-        
+
         window.evaluarCDSSLocal(fila, medTexto, posoTexto, totalDiarioUnidades, dosisTexto, false);
         window.actualizarSaldosYSidebar();
         window.escanearInteraccionesGlobales();
@@ -2665,26 +2700,26 @@ document.getElementById("grillaFila").addEventListener("change", function(e) {
 // 11. NAVEGACIÓN POR TECLADO (ENTER, TAB, FLECHAS) Y NORMALIZACIÓN DE TEXTO
 // ============================================================================
 // Navegación Enter en menú flotante y salto automático de celda
-document.addEventListener("keydown", function(e) {
+document.addEventListener("keydown", function (e) {
     const menuFlotante = document.getElementById("menu-flotante");
     if (menuFlotante && menuFlotante.style.display === "block") {
         const items = menuFlotante.querySelectorAll("div");
-        
-        if (e.key === "ArrowDown") { 
-            e.preventDefault(); 
-            window.opcionResaltadaIndex = (window.opcionResaltadaIndex + 1) % items.length; 
-            window.actualizarResaltado(); 
+
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            window.opcionResaltadaIndex = (window.opcionResaltadaIndex + 1) % items.length;
+            window.actualizarResaltado();
         }
-        else if (e.key === "ArrowUp") { 
-            e.preventDefault(); 
-            window.opcionResaltadaIndex = (window.opcionResaltadaIndex - 1 + items.length) % items.length; 
-            window.actualizarResaltado(); 
+        else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            window.opcionResaltadaIndex = (window.opcionResaltadaIndex - 1 + items.length) % items.length;
+            window.actualizarResaltado();
         }
-        else if (e.key === "Enter" || e.key === "Tab") { 
+        else if (e.key === "Enter" || e.key === "Tab") {
             if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); }
             const indexFinal = window.opcionResaltadaIndex > -1 ? window.opcionResaltadaIndex : 0;
-            if (items[indexFinal]) window.seleccionarOpcion(items[indexFinal].textContent); 
-            
+            if (items[indexFinal]) window.seleccionarOpcion(items[indexFinal].textContent);
+
             if (e.key === "Enter" && window.inputActivo) {
                 const td = window.inputActivo.closest("td");
                 const tr = window.inputActivo.closest("tr");
@@ -2704,8 +2739,8 @@ document.addEventListener("keydown", function(e) {
                 }
             }
         }
-        else if (e.key === "Escape") { 
-            menuFlotante.style.display = "none"; 
+        else if (e.key === "Escape") {
+            menuFlotante.style.display = "none";
         }
     }
 });
@@ -2713,7 +2748,7 @@ document.addEventListener("keydown", function(e) {
 // Navegación Enter en Cabecera del Paciente
 const inputsPaciente = document.querySelectorAll('#alergiaPaciente, .patient-grid input:not([tabindex="-1"]), .patient-grid select:not([tabindex="-1"])');
 inputsPaciente.forEach((input, index) => {
-    input.addEventListener('keydown', function(e) {
+    input.addEventListener('keydown', function (e) {
         if (e.key === 'Enter') {
             if (document.getElementById("menu-flotante").style.display === "block") return;
             e.preventDefault();
@@ -2731,9 +2766,9 @@ inputsPaciente.forEach((input, index) => {
 // Navegación con Flechas y Enter en la Grilla Farmacológica
 const tbodyGrilla = document.querySelector('.med-grid tbody');
 if (tbodyGrilla) {
-    tbodyGrilla.addEventListener('keydown', function(e) {
+    tbodyGrilla.addEventListener('keydown', function (e) {
         const menuFlotanteVisible = document.getElementById("menu-flotante").style.display === "block";
-        if (menuFlotanteVisible && (e.key === 'Enter' || e.key === 'ArrowUp' || e.key === 'ArrowDown')) return; 
+        if (menuFlotanteVisible && (e.key === 'Enter' || e.key === 'ArrowUp' || e.key === 'ArrowDown')) return;
 
         const teclasNavegacion = ['Enter', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
         if (!teclasNavegacion.includes(e.key)) return;
@@ -2788,14 +2823,14 @@ if (tbodyGrilla) {
         }
         else if (e.key === 'Enter') {
             e.preventDefault();
-            const nextRow = currentRow.nextElementSibling; 
+            const nextRow = currentRow.nextElementSibling;
             if (colIndex >= 0 && colIndex <= 2) {
                 const nextCell = cells[colIndex + 1];
                 const nextInput = nextCell.querySelector('input, select');
                 if (nextInput) nextInput.focus();
             }
             else if (colIndex === 3) {
-                currentInput.blur(); 
+                currentInput.blur();
                 if (nextRow) {
                     const firstInputNextRow = nextRow.children[0].querySelector('input, select');
                     if (firstInputNextRow) setTimeout(() => firstInputNextRow.focus(), 10);
@@ -2814,7 +2849,7 @@ if (tbodyGrilla) {
 // Normalización de Paciente (MAYÚSCULAS) y Diagnóstico (Diccionario Clínico)
 const inputPaciente = document.getElementById("paciente");
 if (inputPaciente) {
-    inputPaciente.addEventListener("blur", function() {
+    inputPaciente.addEventListener("blur", function () {
         if (this.value) {
             this.value = this.value.toUpperCase();
             window.programarAutoguardado();
@@ -2824,7 +2859,7 @@ if (inputPaciente) {
 
 const inputDiagnostico = document.getElementById("diagnostico");
 if (inputDiagnostico) {
-    inputDiagnostico.addEventListener("blur", function() {
+    inputDiagnostico.addEventListener("blur", function () {
         if (!this.value) return;
         const conectores = ["y", "e", "o", "u", "de", "del", "con", "sin", "por", "para", "en"];
         let corregido = this.value.split(/\s+/).map((palabraOriginal, index) => {
@@ -2846,7 +2881,7 @@ if (inputDiagnostico) {
 ["loginRut", "regRut", "rut"].forEach(id => {
     const el = document.getElementById(id);
     if (el) {
-        el.addEventListener("input", function() {
+        el.addEventListener("input", function () {
             let valor = this.value.replace(/[^0-9kK]/g, '').toUpperCase();
             this.value = valor.length > 1 ? valor.slice(0, -1) + '-' + valor.slice(-1) : valor;
         });
@@ -2855,8 +2890,31 @@ if (inputDiagnostico) {
 
 document.getElementById("loginRut")?.addEventListener("keypress", e => { if (e.key === "Enter") document.getElementById("loginPin").focus(); });
 document.getElementById("loginPin")?.addEventListener("keypress", e => { if (e.key === "Enter") window.intentarLogin(); });
-document.getElementById("rut")?.addEventListener("blur", function() { window.validarRut(this); window.actualizarSaldosYSidebar(); });
-document.getElementById("inputDias")?.addEventListener("change", function() {
+document.getElementById("rut")?.addEventListener("blur", function () { window.validarRut(this); window.actualizarSaldosYSidebar(); });
+document.getElementById("inputDias")?.addEventListener("change", function () {
+    const selectHoras = document.getElementById("selectHorasDespacho");
+    if (selectHoras && selectHoras.value !== "24") {
+        selectHoras.value = "24";
+        selectHoras.style.background = "rgba(64, 196, 255, 0.12)";
+        selectHoras.style.color = "var(--accent-blue)";
+        selectHoras.style.borderColor = "var(--accent-blue)";
+    }
+    document.querySelectorAll("#grillaFila tr").forEach(fila => {
+        const poso = fila.querySelectorAll("input")[3];
+        if (poso && poso.value.trim() !== "") poso.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+});
+
+document.getElementById("selectHorasDespacho")?.addEventListener("change", function () {
+    const esParcial = this.value !== "24";
+    const inputDias = document.getElementById("inputDias");
+    if (esParcial && inputDias) inputDias.value = "1";
+
+    // Cambiar color visual a naranja/ámbar cuando está en modo Turno Noche (6h, 8h, 12h) para alertar al operador
+    this.style.background = esParcial ? "rgba(255, 152, 0, 0.2)" : "rgba(64, 196, 255, 0.12)";
+    this.style.color = esParcial ? "#ff9800" : "var(--accent-blue)";
+    this.style.borderColor = esParcial ? "#ff9800" : "var(--accent-blue)";
+
     document.querySelectorAll("#grillaFila tr").forEach(fila => {
         const poso = fila.querySelectorAll("input")[3];
         if (poso && poso.value.trim() !== "") poso.dispatchEvent(new Event("change", { bubbles: true }));
@@ -2883,7 +2941,7 @@ if (inputAlergia) {
 // ============================================================================
 // 12. IMPRESIÓN SEGURA, SIDEBAR TABS Y GESTIÓN DE CAMAS (LIMPIEZA / TRASLADO)
 // ============================================================================
-window.imprimirSeguro = function() {
+window.imprimirSeguro = function () {
     // Quita el cursor del input activo para asegurar que el último texto digitado se fije
     if (document.activeElement && document.activeElement.tagName === 'INPUT') {
         document.activeElement.blur();
@@ -2892,7 +2950,7 @@ window.imprimirSeguro = function() {
     window.print();
 };
 
-window.cambiarTabSidebar = function(pestana) {
+window.cambiarTabSidebar = function (pestana) {
     const tabSaldos = document.getElementById("tab-saldos");
     const tabTransito = document.getElementById("tab-transito");
     const contentSaldos = document.getElementById("sidebar-saldos-content");
@@ -2906,7 +2964,7 @@ window.cambiarTabSidebar = function(pestana) {
     }
 };
 
-window.abrirModalGestion = function() {
+window.abrirModalGestion = function () {
     const pacienteActual = document.getElementById("paciente").value.trim();
     if (!pacienteActual) { alert("La cama actual está vacía. No hay paciente para gestionar."); return; }
     const selectServicios = document.getElementById("gestion-nuevo-servicio");
@@ -2919,10 +2977,10 @@ window.abrirModalGestion = function() {
     setTimeout(() => document.getElementById("modal-gestion").classList.add("show"), 10);
 };
 
-window.cerrarModalGestion = function() {
+window.cerrarModalGestion = function () {
     const modal = document.getElementById("modal-gestion");
     modal.classList.remove("show");
-    setTimeout(() => { 
+    setTimeout(() => {
         modal.style.display = "none";
         document.querySelectorAll(".gestion-card").forEach(c => c.classList.remove("activa"));
         document.getElementById("form-traslado").style.display = "none";
@@ -2933,14 +2991,14 @@ window.cerrarModalGestion = function() {
     }, 300);
 };
 
-window.seleccionarOpcionGestion = function(opcion) {
+window.seleccionarOpcionGestion = function (opcion) {
     window.accionGestionSeleccionada = opcion;
     const btnEjecutar = document.getElementById("btn-ejecutar-gestion");
     document.querySelectorAll(".gestion-card").forEach(c => c.classList.remove("activa"));
     document.getElementById("form-traslado").style.display = "none";
     document.getElementById("form-egreso").style.display = "none";
     document.getElementById("form-limpiar").style.display = "none";
-    
+
     document.getElementById("card-" + opcion).classList.add("activa");
     btnEjecutar.style.display = "block";
 
@@ -2950,7 +3008,7 @@ window.seleccionarOpcionGestion = function(opcion) {
         btnEjecutar.style.background = "var(--accent-blue)";
     } else if (opcion === 'transito') {
         btnEjecutar.innerText = "ENVIAR A TRÁNSITO";
-        btnEjecutar.style.background = "#ff9800"; 
+        btnEjecutar.style.background = "#ff9800";
     } else if (opcion === 'egreso') {
         document.getElementById("form-egreso").style.display = "block";
         btnEjecutar.innerText = "ARCHIVAR EGRESO";
@@ -2962,7 +3020,7 @@ window.seleccionarOpcionGestion = function(opcion) {
     }
 };
 
-document.getElementById("btn-ejecutar-gestion")?.addEventListener("click", async function() {
+document.getElementById("btn-ejecutar-gestion")?.addEventListener("click", async function () {
     const camaOrigen = document.getElementById("cama").value;
     const servicioOrigen = document.getElementById("servicio").value;
     const idOrigen = `${servicioOrigen.toLowerCase()}_${camaOrigen.toLowerCase()}`.replace(/\s+/g, '_');
@@ -3001,7 +3059,7 @@ document.getElementById("btn-ejecutar-gestion")?.addEventListener("click", async
             }
             window.cerrarModalGestion();
         }
-        
+
         // ---------------------------------------------------------
         // 🛏️ ACCIÓN: TRASLADO DE CAMA
         // ---------------------------------------------------------
@@ -3009,14 +3067,14 @@ document.getElementById("btn-ejecutar-gestion")?.addEventListener("click", async
             btn.innerText = "TRASLADANDO...";
             const servicioDestino = document.getElementById("gestion-nuevo-servicio").value;
             const camaDestino = document.getElementById("gestion-nueva-cama").value;
-            
+
             if (!servicioDestino || !camaDestino) { alert("⚠️ Seleccione destino."); btn.disabled = false; btn.innerText = textoOriginal; return; }
             if (servicioDestino === servicioOrigen && camaDestino === camaOrigen) { alert("⚠️ El destino es igual al origen."); btn.disabled = false; btn.innerText = textoOriginal; return; }
 
             const idDestino = `${servicioDestino.toLowerCase()}_${camaDestino.toLowerCase()}`.replace(/\s+/g, '_');
             const refOrigen = doc(window.db, "camas_activas", idOrigen);
             const refDestino = doc(window.db, "camas_activas", idDestino);
-            
+
             const snapOrigen = await getDoc(refOrigen);
             const snapDestino = await getDoc(refDestino);
 
@@ -3030,31 +3088,31 @@ document.getElementById("btn-ejecutar-gestion")?.addEventListener("click", async
                 // Hay paciente en la cama destino -> Colisión / Intercambio
                 const datosOcupante = snapDestino.data();
                 const confirmarCruce = confirm(`🚨 COLISIÓN DETECTADA:\nLa ${camaDestino} está ocupada por ${datosOcupante.nombre}.\n\n¿Deseas INTERCAMBIAR las camas de ambos pacientes?`);
-                
+
                 if (confirmarCruce) {
                     btn.innerText = "INTERCAMBIANDO...";
                     datosOcupante.servicio = servicioOrigen;
                     datosOcupante.cama = camaOrigen;
-                    
+
                     // Guardamos cruzado
                     await setDoc(refDestino, datosOrigen);
                     await setDoc(refOrigen, datosOcupante);
-                    
+
                     alert("✅ Intercambio exitoso. Los pacientes han cruzado sus camas.");
                     window.cerrarModalGestion();
-                    window.cargarTratamientoPacienteCama(); 
+                    window.cargarTratamientoPacienteCama();
                 }
             } else {
                 // Cama destino libre -> Movimiento directo
                 await setDoc(refDestino, datosOrigen);
                 await deleteDoc(refOrigen);
-                
+
                 alert(`✅ Traslado exitoso a ${servicioDestino} - ${camaDestino}`);
                 window.cerrarModalGestion();
-                window.cargarTratamientoPacienteCama(); 
+                window.cargarTratamientoPacienteCama();
             }
         }
-        
+
         // ---------------------------------------------------------
         // 🚶 ACCIÓN: ENVIAR A TRÁNSITO
         // ---------------------------------------------------------
@@ -3062,22 +3120,22 @@ document.getElementById("btn-ejecutar-gestion")?.addEventListener("click", async
             btn.innerText = "ENVIANDO A TRÁNSITO...";
             const refOrigen = doc(window.db, "camas_activas", idOrigen);
             const snapOrigen = await getDoc(refOrigen);
-            
+
             if (snapOrigen.exists()) {
                 let datosTransito = snapOrigen.data();
                 datosTransito.origen = `${servicioOrigen} - ${camaOrigen}`;
                 datosTransito.timestamp = new Date().getTime();
-                
+
                 await setDoc(doc(window.db, "pacientes_transito", rut), datosTransito);
                 await deleteDoc(refOrigen);
-                
+
                 alert("✅ Paciente enviado a Tránsito de forma segura.");
                 window.cerrarModalGestion();
-                window.limpiarFormularioPerfil(); 
+                window.limpiarFormularioPerfil();
                 window.cargarSidebarTransito();
             }
         }
-        
+
         // ---------------------------------------------------------
         // 🚪 ACCIÓN: EGRESO CLÍNICO (ARCHIVO)
         // ---------------------------------------------------------
@@ -3086,18 +3144,18 @@ document.getElementById("btn-ejecutar-gestion")?.addEventListener("click", async
             const motivo = document.getElementById("gestion-motivo-egreso").value;
             const refOrigen = doc(window.db, "camas_activas", idOrigen);
             const snapOrigen = await getDoc(refOrigen);
-            
+
             if (snapOrigen.exists()) {
                 let datosEgreso = snapOrigen.data();
                 datosEgreso.motivoEgreso = motivo;
                 const hoy = new Date();
-                datosEgreso.fechaEgreso = `${hoy.getDate().toString().padStart(2, '0')}/${(hoy.getMonth()+1).toString().padStart(2, '0')}/${hoy.getFullYear()}`;
-                
+                datosEgreso.fechaEgreso = `${hoy.getDate().toString().padStart(2, '0')}/${(hoy.getMonth() + 1).toString().padStart(2, '0')}/${hoy.getFullYear()}`;
+
                 await setDoc(doc(window.db, "archivo_historico", rut), datosEgreso);
                 await deleteDoc(refOrigen);
-                
+
                 window.cerrarModalGestion();
-                
+
                 setTimeout(() => {
                     const deseaImprimir = confirm(`✅ Egreso archivado en la nube (${motivo}). Cama liberada.\n\n¿Desea generar el Comprobante de Alta para respaldar el retiro de medicamentos?`);
                     if (deseaImprimir) {
@@ -3106,7 +3164,7 @@ document.getElementById("btn-ejecutar-gestion")?.addEventListener("click", async
                         if (usuario && usuario.nombre) {
                             document.getElementById("firma-farmacia-nombre").innerText = usuario.nombre;
                         }
-                        if(typeof window.imprimirSeguro === "function") window.imprimirSeguro();
+                        if (typeof window.imprimirSeguro === "function") window.imprimirSeguro();
                     } else {
                         window.limpiarFormularioPerfil();
                     }
@@ -3127,18 +3185,18 @@ document.getElementById("btn-ejecutar-gestion")?.addEventListener("click", async
 // 🏥 FUNCIONES DEL PANEL DE TRÁNSITO
 // ============================================================================
 
-window.cargarSidebarTransito = async function() {
+window.cargarSidebarTransito = async function () {
     const contenedor = document.getElementById("sidebar-transito-content");
     const badge = document.getElementById("badge-transito");
-    
+
     try {
         const querySnapshot = await getDocs(collection(window.db, "pacientes_transito"));
         let pacientes = [];
         querySnapshot.forEach((doc) => pacientes.push(doc.data()));
 
         if (pacientes.length === 0) {
-            if(badge) badge.style.display = "none";
-            if(contenedor) contenedor.innerHTML = `
+            if (badge) badge.style.display = "none";
+            if (contenedor) contenedor.innerHTML = `
                 <div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px; line-height: 1.5;">
                     <span class="material-icons-round" style="font-size: 32px; color: var(--glass-border); margin-bottom: 10px;">transfer_within_a_station</span><br>
                     No hay pacientes en tránsito. Las camas liberadas aparecerán aquí.
@@ -3146,18 +3204,18 @@ window.cargarSidebarTransito = async function() {
             return;
         }
 
-        if(badge) {
+        if (badge) {
             badge.style.display = "inline-block";
-            badge.innerText = pacientes.length; 
+            badge.innerText = pacientes.length;
         }
-        
+
         pacientes.sort((a, b) => b.timestamp - a.timestamp);
 
         let html = "";
         pacientes.forEach(p => {
             let ahora = new Date().getTime();
             let diffMinutos = Math.floor((ahora - (p.timestamp || ahora)) / 60000);
-            let tiempoStr = diffMinutos < 60 ? `Hace ${diffMinutos} min` : `Hace ${Math.floor(diffMinutos/60)} hrs`;
+            let tiempoStr = diffMinutos < 60 ? `Hace ${diffMinutos} min` : `Hace ${Math.floor(diffMinutos / 60)} hrs`;
 
             html += `
             <div class="nutricion-item" style="border-left: 4px solid var(--accent-red); display: block; background: rgba(255, 82, 82, 0.05);">
@@ -3181,14 +3239,14 @@ window.cargarSidebarTransito = async function() {
                 </div>
             </div>`;
         });
-        if(contenedor) contenedor.innerHTML = html;
+        if (contenedor) contenedor.innerHTML = html;
 
-    } catch(e) {
+    } catch (e) {
         console.error("Error cargando tránsito:", e);
     }
 };
 
-window.ejecutarRescate = async function(rutPaciente, nombrePaciente) {
+window.ejecutarRescate = async function (rutPaciente, nombrePaciente) {
     const servicioDestino = document.getElementById("servicio").value;
     const camaDestino = document.getElementById("cama").value;
 
@@ -3212,25 +3270,25 @@ window.ejecutarRescate = async function(rutPaciente, nombrePaciente) {
 
         const refTransito = doc(window.db, "pacientes_transito", rutPaciente);
         const snapTransito = await getDoc(refTransito);
-        
+
         if (snapTransito.exists()) {
             let datos = snapTransito.data();
             datos.servicio = servicioDestino;
             datos.cama = camaDestino;
-            
+
             await setDoc(refDestino, datos);
             await deleteDoc(refTransito);
-            
+
             alert(`✅ ${nombrePaciente} ha sido rescatado y asignado a la ${camaDestino}.`);
-            window.cargarSidebarTransito(); 
-            window.cargarTratamientoPacienteCama(); 
+            window.cargarSidebarTransito();
+            window.cargarTratamientoPacienteCama();
         }
-    } catch(e) {
+    } catch (e) {
         alert("❌ Error de conexión: " + e.message);
     }
 };
 
-window.ejecutarAltaTransito = function(rutPaciente, nombrePaciente) {
+window.ejecutarAltaTransito = function (rutPaciente, nombrePaciente) {
     let modalHtml = document.getElementById("modal-alta-transito-rapida");
     if (!modalHtml) {
         modalHtml = document.createElement("div");
@@ -3272,7 +3330,7 @@ window.ejecutarAltaTransito = function(rutPaciente, nombrePaciente) {
     const newBtnConfirmar = btnConfirmar.cloneNode(true);
     btnConfirmar.parentNode.replaceChild(newBtnConfirmar, btnConfirmar);
 
-    newBtnConfirmar.onclick = async function() {
+    newBtnConfirmar.onclick = async function () {
         const motivoFinal = document.getElementById("motivo-alta-transito").value;
         const textOriginal = this.innerText;
         this.innerText = "ARCHIVANDO...";
@@ -3281,16 +3339,16 @@ window.ejecutarAltaTransito = function(rutPaciente, nombrePaciente) {
         try {
             const refTransito = doc(window.db, "pacientes_transito", rutPaciente);
             const snapTransito = await getDoc(refTransito);
-            
+
             if (snapTransito.exists()) {
                 let datosEgreso = snapTransito.data();
                 datosEgreso.motivoEgreso = motivoFinal;
                 const hoy = new Date();
-                datosEgreso.fechaEgreso = `${hoy.getDate().toString().padStart(2, '0')}/${(hoy.getMonth()+1).toString().padStart(2, '0')}/${hoy.getFullYear()}`;
-                
+                datosEgreso.fechaEgreso = `${hoy.getDate().toString().padStart(2, '0')}/${(hoy.getMonth() + 1).toString().padStart(2, '0')}/${hoy.getFullYear()}`;
+
                 await setDoc(doc(window.db, "archivo_historico", rutPaciente), datosEgreso);
                 await deleteDoc(refTransito);
-                
+
                 modalHtml.classList.remove('show');
                 setTimeout(() => modalHtml.style.display = 'none', 300);
                 alert(`✅ ${nombrePaciente} ha sido archivado/dado de alta correctamente.`);
@@ -3334,7 +3392,7 @@ setTimeout(async () => {
 // ============================================================================
 
 const SERVICIOS_DESPACHO = [
-    'UCI Norte', 'UCI Sur A', 'UCI Sur B', 'UTI', 
+    'UCI Norte', 'UCI Sur A', 'UCI Sur B', 'UTI',
     'MEDICINA', 'UCM', 'CIRUGIA', 'PEDIATRIA'
 ];
 
@@ -3350,7 +3408,7 @@ const SOLU_DB = [
     "Agua Estéril 10 mL", "Glucosa 5% 250 mL", "Glucosa 5% 500 mL", "Glucosa 5% 1000 mL",
     "Glucosa 10 % 250 mL", "Glucosa 10 % 500 mL", "Glucosa 10 % 1000 mL",
     "Glucosa 30 % 20 mL", "Glucosa 30 % 500 mL", "Glucosalino 500 mL", "Glucosalino 1000 mL",
-    "Ringer Lactato 500 mL", "Sodio Cloruro 09% 5 mL", "Sodio Cloruro 09% 20 mL", "Sodio Cloruro 0.9% 100 mL", 
+    "Ringer Lactato 500 mL", "Sodio Cloruro 09% 5 mL", "Sodio Cloruro 09% 20 mL", "Sodio Cloruro 0.9% 100 mL",
     "Sodio Cloruro 0.9% 250 mL", "Sodio Cloruro 0.9% 500 mL", "Sodio Cloruro 0.9% 1000 mL", "Potasio Cloruro 2 g (10% en 10 mL)",
     "Sodio Cloruro 10% 20 mL", "Sodio Bicarbonato 2/3 Molar 250 mL"
 ];
@@ -3360,11 +3418,11 @@ const STOCK_DB = [
     "Insulina NPH 100 UI/10 mL", "Insulina Cristalina 100 UI/10 mL"
 ];
 
-window.initDespachoData = function() {
+window.initDespachoData = function () {
     let obj = {};
-    SERVICIOS_DESPACHO.forEach(s => { 
-        obj[s] = {}; 
-        [...NUTRI_DB, ...SOLU_DB, ...STOCK_DB].forEach(p => obj[s][p] = 0); 
+    SERVICIOS_DESPACHO.forEach(s => {
+        obj[s] = {};
+        [...NUTRI_DB, ...SOLU_DB, ...STOCK_DB].forEach(p => obj[s][p] = 0);
     });
     return obj;
 };
@@ -3383,13 +3441,13 @@ window.despachoSrv = SERVICIOS_DESPACHO[0];
 window.despachoCat = "nutri";
 window.numpadItem = "";
 
-window.saveDespacho = function() {
+window.saveDespacho = function () {
     localStorage.setItem('nutri_stock_v6', JSON.stringify(window.despachoData));
 };
 
-window.abrirDespachoModal = function() {
+window.abrirDespachoModal = function () {
     let overlay = document.getElementById('modalDespachoOverlay');
-    
+
     // Reconstruimos el contenedor con el diseño exacto del módulo original
     if (overlay) overlay.remove();
 
@@ -3397,7 +3455,7 @@ window.abrirDespachoModal = function() {
     overlay.id = "modalDespachoOverlay";
     overlay.className = "modal-overlay";
     overlay.style.cssText = "z-index: 999999; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);";
-    
+
     overlay.innerHTML = `
       <style>
         #modalDespachoBox {
@@ -3584,7 +3642,7 @@ window.abrirDespachoModal = function() {
     window.despachoSetCat(window.despachoCat || 'nutri');
 };
 
-window.cerrarDespachoModal = function() {
+window.cerrarDespachoModal = function () {
     const overlay = document.getElementById('modalDespachoOverlay');
     if (!overlay) return;
     overlay.classList.remove('show');
@@ -3592,12 +3650,12 @@ window.cerrarDespachoModal = function() {
     setTimeout(() => { overlay.style.display = 'none'; }, 300);
 };
 
-window.despachoSetSrv = function(s) {
+window.despachoSetSrv = function (s) {
     window.despachoSrv = s;
     window.renderDespachoList();
 };
 
-window.despachoSetCat = function(c) {
+window.despachoSetCat = function (c) {
     window.despachoCat = c;
     document.querySelectorAll('#modalDespachoBox .desp-tab').forEach(b => b.classList.remove('active'));
     const btn = document.getElementById('btn-' + c);
@@ -3605,27 +3663,27 @@ window.despachoSetCat = function(c) {
     window.renderDespachoList();
 };
 
-window.getSafeId = function(str) { return str.replace(/[^a-zA-Z0-9]/g, '_'); };
+window.getSafeId = function (str) { return str.replace(/[^a-zA-Z0-9]/g, '_'); };
 
-window.renderDespachoList = function() {
+window.renderDespachoList = function () {
     const c = document.getElementById('despachoContent');
     const f = document.getElementById('despachoFooterActions');
     if (!c || !f) return;
     c.innerHTML = ''; f.innerHTML = '';
 
     if (window.despachoCat === 'total') {
-        c.className = "summary-grid"; 
+        c.className = "summary-grid";
         window.renderTotalBodega(c, f);
     } else {
-        c.className = "desp-items-grid"; 
+        c.className = "desp-items-grid";
         let listado = window.despachoCat === 'nutri' ? NUTRI_DB : (window.despachoCat === 'solu' ? SOLU_DB : STOCK_DB);
-        
+
         listado.forEach((p, index) => {
             const val = (window.despachoData[window.despachoSrv] && window.despachoData[window.despachoSrv][p]) || 0;
             const div = document.createElement('div');
             div.className = 'desp-card';
             div.style.animationDelay = (index * 0.02) + "s";
-            
+
             let namePart = p; let volPart = "";
             const parts = p.split(' ');
             if (parts.length > 1) {
@@ -3658,9 +3716,9 @@ window.renderDespachoList = function() {
     }
 };
 
-window.renderTotalBodega = function(c, f) {
+window.renderTotalBodega = function (c, f) {
     let hayAlgo = false;
-    
+
     [...NUTRI_DB, ...SOLU_DB, ...STOCK_DB].forEach((p, index) => {
         let totalP = 0; let rows = '';
         SERVICIOS_DESPACHO.forEach(s => {
@@ -3699,7 +3757,7 @@ window.renderTotalBodega = function(c, f) {
     }
 };
 
-window.updDespacho = function(p, delta) {
+window.updDespacho = function (p, delta) {
     let v = ((window.despachoData[window.despachoSrv] && window.despachoData[window.despachoSrv][p]) || 0) + delta;
     v = v < 0 ? 0 : v;
     window.despachoData[window.despachoSrv][p] = v;
@@ -3709,7 +3767,7 @@ window.updDespacho = function(p, delta) {
 };
 
 // TECLADO VIRTUAL DESPACHO
-window.openNumpad = function(item) {
+window.openNumpad = function (item) {
     window.numpadItem = item;
     let val = (window.despachoData[window.despachoSrv] && window.despachoData[window.despachoSrv][item]) || 0;
     document.getElementById('numpad-title').innerText = item;
@@ -3717,11 +3775,11 @@ window.openNumpad = function(item) {
     document.getElementById('numpad-overlay').classList.add('active');
 };
 
-window.closeNumpad = function() {
+window.closeNumpad = function () {
     document.getElementById('numpad-overlay').classList.remove('active');
 };
 
-window.numpadType = function(key) {
+window.numpadType = function (key) {
     let display = document.getElementById('numpad-val');
     let val = display.innerText;
     if (key === 'C') display.innerText = '0';
@@ -3730,7 +3788,7 @@ window.numpadType = function(key) {
     if (display.innerText === '') display.innerText = '0';
 };
 
-window.numpadConfirm = function() {
+window.numpadConfirm = function () {
     let num = parseInt(document.getElementById('numpad-val').innerText);
     window.despachoData[window.despachoSrv][window.numpadItem] = (isNaN(num) || num < 0) ? 0 : num;
     window.saveDespacho();
@@ -3739,7 +3797,7 @@ window.numpadConfirm = function() {
     window.closeNumpad();
 };
 
-document.addEventListener('keydown', function(event) {
+document.addEventListener('keydown', function (event) {
     const overlay = document.getElementById('numpad-overlay');
     if (!overlay || !overlay.classList.contains('active')) return;
 
@@ -3752,33 +3810,33 @@ document.addEventListener('keydown', function(event) {
 });
 
 // ACCIONES GENERALES DESPACHO
-window.resetDespacho = function() {
+window.resetDespacho = function () {
     Swal.fire({
-      title: '¿Reiniciar Sistema?', 
-      text: 'Se borrarán todos los conteos de TODOS los servicios clínicos.', 
-      icon: 'warning',
-      showCancelButton: true, confirmButtonColor: '#ff5252', cancelButtonColor: '#3c3c43',
-      confirmButtonText: 'Sí, limpiar todo', cancelButtonText: 'Cancelar',
-      background: document.body.classList.contains('light-theme') ? '#ffffff' : '#1c1c1e',
-      color: document.body.classList.contains('light-theme') ? '#000000' : '#ffffff',
-      borderRadius: '20px',
-      didOpen: () => {
-          const swalContainer = document.querySelector('.swal2-container');
-          if (swalContainer) swalContainer.style.zIndex = '99999999';
-      }
-    }).then(r => { 
-      if (r.isConfirmed) { 
-          window.despachoData = window.initDespachoData(); 
-          window.saveDespacho();
-          window.despachoSetCat('nutri'); 
-      }
+        title: '¿Reiniciar Sistema?',
+        text: 'Se borrarán todos los conteos de TODOS los servicios clínicos.',
+        icon: 'warning',
+        showCancelButton: true, confirmButtonColor: '#ff5252', cancelButtonColor: '#3c3c43',
+        confirmButtonText: 'Sí, limpiar todo', cancelButtonText: 'Cancelar',
+        background: document.body.classList.contains('light-theme') ? '#ffffff' : '#1c1c1e',
+        color: document.body.classList.contains('light-theme') ? '#000000' : '#ffffff',
+        borderRadius: '20px',
+        didOpen: () => {
+            const swalContainer = document.querySelector('.swal2-container');
+            if (swalContainer) swalContainer.style.zIndex = '99999999';
+        }
+    }).then(r => {
+        if (r.isConfirmed) {
+            window.despachoData = window.initDespachoData();
+            window.saveDespacho();
+            window.despachoSetCat('nutri');
+        }
     });
 };
 
-window.descargarInforme = function() {
+window.descargarInforme = function () {
     let fecha = new Date().toLocaleDateString('es-CL');
-    let hora = new Date().toLocaleTimeString('es-CL', {hour: '2-digit', minute:'2-digit'});
-    
+    let hora = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+
     let html = `<html><head><title>Despacho Farmacia - ${fecha}</title><style>
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
       body { font-family: 'Inter', sans-serif; padding: 20px; color: #1c1c1e; max-width: 100%; margin: 0 auto; }
@@ -3806,25 +3864,25 @@ window.descargarInforme = function() {
     let hayDatosGlobal = false;
 
     SERVICIOS_DESPACHO.forEach(srv => {
-      let srvHasData = false;
-      let srvHTML = `<div class="service-block"><div class="service-title">${srv}</div>`;
+        let srvHasData = false;
+        let srvHTML = `<div class="service-block"><div class="service-title">${srv}</div>`;
 
-      let nutriHTML = ''; NUTRI_DB.forEach(p => { let v = window.despachoData[srv][p] || 0; if (v > 0) nutriHTML += `<div class="item-row"><div class="item-name">${p}</div><div class="item-total">${v}</div></div>`; });
-      if (nutriHTML) { srvHasData = true; srvHTML += `<div class="category-title">Nutriciones</div><div class="items-grid">${nutriHTML}</div>`; }
+        let nutriHTML = ''; NUTRI_DB.forEach(p => { let v = window.despachoData[srv][p] || 0; if (v > 0) nutriHTML += `<div class="item-row"><div class="item-name">${p}</div><div class="item-total">${v}</div></div>`; });
+        if (nutriHTML) { srvHasData = true; srvHTML += `<div class="category-title">Nutriciones</div><div class="items-grid">${nutriHTML}</div>`; }
 
-      let soluHTML = ''; SOLU_DB.forEach(p => { let v = window.despachoData[srv][p] || 0; if (v > 0) soluHTML += `<div class="item-row"><div class="item-name">${p}</div><div class="item-total">${v}</div></div>`; });
-      if (soluHTML) { srvHasData = true; srvHTML += `<div class="category-title">Soluciones</div><div class="items-grid">${soluHTML}</div>`; }
+        let soluHTML = ''; SOLU_DB.forEach(p => { let v = window.despachoData[srv][p] || 0; if (v > 0) soluHTML += `<div class="item-row"><div class="item-name">${p}</div><div class="item-total">${v}</div></div>`; });
+        if (soluHTML) { srvHasData = true; srvHTML += `<div class="category-title">Soluciones</div><div class="items-grid">${soluHTML}</div>`; }
 
-      let stockHTML = ''; STOCK_DB.forEach(p => { let v = window.despachoData[srv][p] || 0; if (v > 0) stockHTML += `<div class="item-row"><div class="item-name">${p}</div><div class="item-total">${v}</div></div>`; });
-      if (stockHTML) { srvHasData = true; srvHTML += `<div class="category-title">Stock Clínico</div><div class="items-grid">${stockHTML}</div>`; }
+        let stockHTML = ''; STOCK_DB.forEach(p => { let v = window.despachoData[srv][p] || 0; if (v > 0) stockHTML += `<div class="item-row"><div class="item-name">${p}</div><div class="item-total">${v}</div></div>`; });
+        if (stockHTML) { srvHasData = true; srvHTML += `<div class="category-title">Stock Clínico</div><div class="items-grid">${stockHTML}</div>`; }
 
-      srvHTML += `</div>`;
-      if (srvHasData) { hayDatosGlobal = true; html += srvHTML; }
+        srvHTML += `</div>`;
+        if (srvHasData) { hayDatosGlobal = true; html += srvHTML; }
     });
 
-    if(!hayDatosGlobal) { html += `<div style="text-align:center; padding: 50px; color: #888; font-weight:600;">No hay productos registrados para despachar.</div>`; }
+    if (!hayDatosGlobal) { html += `<div style="text-align:center; padding: 50px; color: #888; font-weight:600;">No hay productos registrados para despachar.</div>`; }
     html += `</body></html>`;
-    
+
     const win = window.open('', '_blank');
     win.document.write(html);
     win.document.close();
@@ -3835,32 +3893,32 @@ window.descargarInforme = function() {
 // 15. MÓDULO INTEGRADO: CALCULADORA CLÍNICA (AUTO-INYECTABLE Y SINCRONIZADA)
 // ============================================================================
 
-const CALC_DB_MEDS = { 
-    "Salbutamol 100 mcg": 200, 
-    "Bromuro Ipratropio 20 mcg": 200, 
-    "Budesonida 200 mcg": 120, 
-    "Fluticasona 125 mcg": 120, 
-    "Salmeterol / Fluticasona 25/125 mcg": 120, 
-    "Salmeterol / Fluticasona 25/250 mcg": 120, 
-    "Tiotropio / Olodaterol 2.5/2.5 mcg": 30, 
-    "Budesonida / Formoterol 160/4.5 mcg": 60, 
-    "Budesonida / Formoterol 320/9 mcg": 120 
+const CALC_DB_MEDS = {
+    "Salbutamol 100 mcg": 200,
+    "Bromuro Ipratropio 20 mcg": 200,
+    "Budesonida 200 mcg": 120,
+    "Fluticasona 125 mcg": 120,
+    "Salmeterol / Fluticasona 25/125 mcg": 120,
+    "Salmeterol / Fluticasona 25/250 mcg": 120,
+    "Tiotropio / Olodaterol 2.5/2.5 mcg": 30,
+    "Budesonida / Formoterol 160/4.5 mcg": 60,
+    "Budesonida / Formoterol 320/9 mcg": 120
 };
 
-const CALC_DB_LIQUIDOS = { 
-    "Amoxicilina 250 mg/5 mL": { mg: 250, ml: 5, total: 60 }, 
-    "Amoxicilina 500 mg/5 mL": { mg: 500, ml: 5, total: 60 }, 
-    "Ácido Ursodesoxicólico 250 mg/5 mL": { mg: 250, ml: 5, total: 200 }, 
-    "Ácido Valproico 250 mg/5 mL": { mg: 250, ml: 5, total: 120 }, 
-    "Azitromicina 200 mg/5 mL": { mg: 200, ml: 5, total: 30 }, 
-    "Cefadroxilo 250 mg/5 mL": { mg: 250, ml: 5, total: 60 }, 
-    "Levetiracetam 500 mg/5 mL": { mg: 500, ml: 5, total: 300 }, 
-    "Paracetamol 120 mg/5 mL": { mg: 120, ml: 5, total: 60 }, 
+const CALC_DB_LIQUIDOS = {
+    "Amoxicilina 250 mg/5 mL": { mg: 250, ml: 5, total: 60 },
+    "Amoxicilina 500 mg/5 mL": { mg: 500, ml: 5, total: 60 },
+    "Ácido Ursodesoxicólico 250 mg/5 mL": { mg: 250, ml: 5, total: 200 },
+    "Ácido Valproico 250 mg/5 mL": { mg: 250, ml: 5, total: 120 },
+    "Azitromicina 200 mg/5 mL": { mg: 200, ml: 5, total: 30 },
+    "Cefadroxilo 250 mg/5 mL": { mg: 250, ml: 5, total: 60 },
+    "Levetiracetam 500 mg/5 mL": { mg: 500, ml: 5, total: 300 },
+    "Paracetamol 120 mg/5 mL": { mg: 120, ml: 5, total: 60 },
     "N-Acetil-Cisteína 100 mg/mL": { mg: 100, ml: 1, total: 60 },
-    "Sulfato Ferroso 125 mg/1 mL": { mg: 125, ml: 1, total: 30, gotas: "" }, 
+    "Sulfato Ferroso 125 mg/1 mL": { mg: 125, ml: 1, total: 30, gotas: "" },
     "Sulfato de Zinc 5 mg/1 mL": { mg: 5, ml: 1, total: 30, gotas: "" },
     "Vitamina ACD 2500 UI/1 mL": { mg: 2500, ml: 1, total: 30, gotas: "" },
-    "Risperidona 1 mg/mL": { mg: 1, ml: 1, total: 30, gotas: "" }, 
+    "Risperidona 1 mg/mL": { mg: 1, ml: 1, total: 30, gotas: "" },
     "Tramadol 100 mg/1 mL": { mg: 100, ml: 1, total: 10, gotas: "" },
     "BioGaia (Probiótico)": { biogaia: true }
 };
@@ -3868,7 +3926,7 @@ const CALC_DB_LIQUIDOS = {
 window.CALC_CURRENT_MODE = 'PESO';
 window.calcInputActivo = null;
 
-window.abrirCalculadoraModal = function() {
+window.abrirCalculadoraModal = function () {
     let overlay = document.getElementById('modalCalcOverlay');
     const isIframeVersion = overlay && overlay.innerHTML.includes('iframeCalculadora');
 
@@ -4290,7 +4348,7 @@ window.abrirCalculadoraModal = function() {
         window.calcAgregarFilaEsquema();
 
         // Escuchador de foco exclusivo para iluminar las píldoras de la calculadora
-        document.getElementById('modalCalcBox').addEventListener('focusin', function(e) {
+        document.getElementById('modalCalcBox').addEventListener('focusin', function (e) {
             if (e.target.tagName === 'INPUT' && (e.target.type === 'text' || e.target.type === 'number')) {
                 window.calcInputActivo = e.target;
                 document.querySelectorAll('#modalCalcBox .calc-pill').forEach(p => p.classList.remove('focused'));
@@ -4316,15 +4374,15 @@ window.abrirCalculadoraModal = function() {
     }
 
     overlay.style.display = 'flex';
-    setTimeout(() => { 
-        overlay.classList.add('show'); 
-        overlay.style.opacity = '1'; 
+    setTimeout(() => {
+        overlay.classList.add('show');
+        overlay.style.opacity = '1';
         const primerInput = document.querySelector('#modalCalcBox .calc-mode-section:not(.hidden) input:not([readonly])');
         if (primerInput) primerInput.focus();
     }, 10);
 };
 
-window.cerrarCalculadoraModal = function() {
+window.cerrarCalculadoraModal = function () {
     const overlay = document.getElementById('modalCalcOverlay');
     if (!overlay) return;
     overlay.classList.remove('show');
@@ -4333,7 +4391,7 @@ window.cerrarCalculadoraModal = function() {
 };
 
 // TECLADO CLÍNICO INTERNO
-window.calcTeclear = function(valor, evento) {
+window.calcTeclear = function (valor, evento) {
     if (evento) evento.preventDefault();
     if (!window.calcInputActivo) return;
 
@@ -4355,7 +4413,7 @@ window.calcTeclear = function(valor, evento) {
     window.calcInputActivo.dispatchEvent(new Event('input', { bubbles: true }));
 };
 
-window.calcSiguienteCelda = function(evento) {
+window.calcSiguienteCelda = function (evento) {
     if (evento) evento.preventDefault();
     const seccionActiva = document.querySelector('#modalCalcBox .calc-mode-section:not(.hidden)');
     if (!seccionActiva) return;
@@ -4388,7 +4446,7 @@ window.calcSiguienteCelda = function(evento) {
 };
 
 // NAVEGACIÓN DE PESTAÑAS Y ETIQUETAS DE LA CALCULADORA
-window.calcActualizarEtiquetas = function() {
+window.calcActualizarEtiquetas = function () {
     const t = document.getElementById('calc_unidadTiempo').value;
     const c = document.getElementById('calc_unidadConc').value;
     if (window.CALC_CURRENT_MODE === 'PESO') {
@@ -4400,7 +4458,7 @@ window.calcActualizarEtiquetas = function() {
     }
 };
 
-window.calcSetMode = function(mode) {
+window.calcSetMode = function (mode) {
     window.CALC_CURRENT_MODE = mode;
     ['calcBtnPeso', 'calcBtnFija', 'calcBtnJarabe', 'calcBtnStock', 'calcBtnClinica', 'calcBtnEsquema'].forEach(id => {
         const el = document.getElementById(id);
@@ -4441,7 +4499,7 @@ window.calcSetMode = function(mode) {
     }, 80);
 };
 
-window.calcMostrarResultado = function(elementId, htmlContent) {
+window.calcMostrarResultado = function (elementId, htmlContent) {
     const el = document.getElementById(elementId);
     if (!el) return;
     el.innerHTML = htmlContent;
@@ -4452,7 +4510,7 @@ window.calcMostrarResultado = function(elementId, htmlContent) {
 };
 
 // FÓRMULAS MATEMÁTICAS Y CLÍNICAS
-window.calcCalcularStock = function() {
+window.calcCalcularStock = function () {
     const d = parseFloat(document.getElementById('calc_dosis').value);
     let c = parseFloat(document.getElementById('calc_concentracion').value);
     const p = parseFloat(document.getElementById('calc_peso').value) || 1;
@@ -4474,7 +4532,7 @@ window.calcCalcularStock = function() {
     window.calcMostrarResultado('calc_resAmp', html);
 };
 
-window.calcCalcularBomba = function() {
+window.calcCalcularBomba = function () {
     const d = parseFloat(document.getElementById('calc_dosis').value);
     let c = parseFloat(document.getElementById('calc_concentracion').value);
     const v = parseFloat(document.getElementById('calc_volumen').value);
@@ -4499,14 +4557,14 @@ window.calcCalcularBomba = function() {
     window.calcMostrarResultado('calc_resBomba', html);
 };
 
-window.calcCargarDatosMed = function() {
+window.calcCargarDatosMed = function () {
     const med = document.getElementById('calc_selectMed').value;
     if (!med) return;
     document.getElementById('calc_totalEnvase').value = CALC_DB_MEDS[med];
     document.getElementById('calc_lblStockDosis').innerText = med.includes("Valproico") || med.includes("Acetil") ? "Dosis (mL)" : "Puffs por vez";
 };
 
-window.calcAutoCompletarJarabe = function() {
+window.calcAutoCompletarJarabe = function () {
     const val = document.getElementById('calc_selectJarabe').value;
     const j = CALC_DB_LIQUIDOS[val];
     const isBioGaia = val === "BioGaia (Probiótico)";
@@ -4554,7 +4612,7 @@ window.calcAutoCompletarJarabe = function() {
     }
 };
 
-window.calcCalcularJarabe = function() {
+window.calcCalcularJarabe = function () {
     const val = document.getElementById('calc_selectJarabe').value;
     const isBioGaia = val === "BioGaia (Probiótico)";
     let msg = '';
@@ -4611,7 +4669,7 @@ window.calcCalcularJarabe = function() {
     window.calcMostrarResultado('calc_resJarabe', msg);
 };
 
-window.calcCalcularDuracion = function() {
+window.calcCalcularDuracion = function () {
     const cant = parseFloat(document.getElementById('calc_cantVez').value);
     const horas = parseFloat(document.getElementById('calc_frecHoras').value);
     const total = parseFloat(document.getElementById('calc_totalEnvase').value);
@@ -4621,7 +4679,7 @@ window.calcCalcularDuracion = function() {
     window.calcMostrarResultado('calc_resInhala', html);
 };
 
-window.calcCalcularRenal = function() {
+window.calcCalcularRenal = function () {
     const e = parseFloat(document.getElementById('calc_edadCr').value);
     const p = parseFloat(document.getElementById('calc_pesoCr').value);
     const c = parseFloat(document.getElementById('calc_creaCr').value);
@@ -4641,7 +4699,7 @@ window.calcCalcularRenal = function() {
     window.calcMostrarResultado('calc_resRenal', `🩸 Clearance Creatinina: <b style="font-size: 18px;">${crcl.toFixed(1)} mL/min</b><br><span style="color: ${color}; font-size: 12px; font-weight: 800;">${estado.toUpperCase()}</span>`);
 };
 
-window.calcCalcularBSA = function() {
+window.calcCalcularBSA = function () {
     const p = parseFloat(document.getElementById('calc_pesoBsa').value);
     const a = parseFloat(document.getElementById('calc_alturaBsa').value);
     if (!p || !a) return;
@@ -4651,7 +4709,7 @@ window.calcCalcularBSA = function() {
 };
 
 // MOTOR DE DESESCALADA DE CORTICOIDES (TAPERING)
-window.calcAgregarFilaEsquema = function() {
+window.calcAgregarFilaEsquema = function () {
     const contenedor = document.getElementById('calc_esquemaContenedor');
     if (!contenedor) return;
     const filas = contenedor.querySelectorAll('.esquema-row');
@@ -4713,7 +4771,7 @@ window.calcAgregarFilaEsquema = function() {
     contenedor.appendChild(div.firstChild);
 };
 
-window.calcCalcularEsquema = function(hacerScroll = true) {
+window.calcCalcularEsquema = function (hacerScroll = true) {
     const filas = document.querySelectorAll('#calc_esquemaContenedor .esquema-row');
     const resBox = document.getElementById('calc_resEsquema');
 
@@ -4816,20 +4874,20 @@ window.calcCalcularEsquema = function(hacerScroll = true) {
 // ============================================================================
 // 16. MODAL HISTÓRICO Y CÁPSULA DEL TIEMPO (FIRESTORE)
 // ============================================================================
-window.abrirModalHistorico = async function() {
+window.abrirModalHistorico = async function () {
     const modal = document.getElementById("modal-historico");
     if (modal) {
-        modal.style.display = "flex"; 
+        modal.style.display = "flex";
         setTimeout(() => modal.classList.add("show"), 10);
-        
+
         document.getElementById("lista-egresos-recientes").innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 12px; margin-top: 10px;"><span class="material-icons-round" style="font-size: 24px; display: block; margin-bottom: 5px;">cloud_download</span>Conectando con el Archivo Histórico...</div>`;
-        
+
         const inputRutHist = document.getElementById("input-buscar-rut-historico");
         if (inputRutHist) {
-            inputRutHist.value = ""; 
-            inputRutHist.oninput = function() {
+            inputRutHist.value = "";
+            inputRutHist.oninput = function () {
                 let valor = this.value.replace(/[^0-9kK]/g, '').toUpperCase();
-                if (valor.length > 1) { this.value = valor.slice(0, -1) + '-' + valor.slice(-1); } 
+                if (valor.length > 1) { this.value = valor.slice(0, -1) + '-' + valor.slice(-1); }
                 else { this.value = valor; }
             };
         }
@@ -4839,13 +4897,13 @@ window.abrirModalHistorico = async function() {
             const snap = await getDocs(collection(window.db, "archivo_historico"));
             let egresos = [];
             snap.forEach(documento => egresos.push(documento.data()));
-            
+
             egresos.sort((a, b) => {
                 let dateA = new Date(a.ultimaModificacion || 0).getTime();
                 let dateB = new Date(b.ultimaModificacion || 0).getTime();
-                return dateB - dateA; 
+                return dateB - dateA;
             });
-            
+
             egresos = egresos.slice(0, 15); // Muestra solo los 15 más recientes para agilidad
 
             let html = "";
@@ -4870,21 +4928,21 @@ window.abrirModalHistorico = async function() {
     }
 };
 
-window.cerrarModalHistorico = function() {
+window.cerrarModalHistorico = function () {
     const modal = document.getElementById("modal-historico");
-    if (modal) { 
+    if (modal) {
         modal.classList.remove("show");
-        setTimeout(() => modal.style.display = "none", 400); 
+        setTimeout(() => modal.style.display = "none", 400);
     }
 };
 
-window.ejecutarBusquedaHistorica = function() {
+window.ejecutarBusquedaHistorica = function () {
     const rut = document.getElementById("input-buscar-rut-historico").value.trim();
     if (!rut || rut.length < 8) { alert("⚠️ Ingrese un RUT válido para buscar."); return; }
     window.cargarPerfilHistorico(rut);
 };
 
-window.cargarPerfilHistorico = async function(rutBuscado) {
+window.cargarPerfilHistorico = async function (rutBuscado) {
     const modal = document.getElementById("modal-historico");
     const btn = modal.querySelector(".modal-actions .btn-validar");
     const textoOriginal = btn ? btn.innerText : "BUSCAR PACIENTE";
@@ -4895,21 +4953,21 @@ window.cargarPerfilHistorico = async function(rutBuscado) {
         const docSnap = await getDoc(docRef);
 
         if (btn) { btn.innerText = textoOriginal; btn.disabled = false; }
-        
+
         if (docSnap.exists()) {
             const res = docSnap.data();
             window.cerrarModalHistorico();
-            
+
             // Bloqueo total de la cápsula del tiempo (Solo Lectura)
             window.isModoHistorico = true;
             document.body.classList.add("modo-historico");
-            
+
             const overlay = document.getElementById("loginOverlay");
             if (overlay) {
                 overlay.style.opacity = "0";
                 setTimeout(() => overlay.style.display = "none", 500);
             }
-            
+
             const usuario = JSON.parse(sessionStorage.getItem("FarmaPerfil_Sesion") || "{}");
             if (usuario.nombre) {
                 const displayNombre = document.getElementById("displayUserName");
@@ -4917,9 +4975,9 @@ window.cargarPerfilHistorico = async function(rutBuscado) {
                 if (displayNombre) displayNombre.innerText = usuario.nombre;
                 if (displayRol) displayRol.innerText = usuario.rol;
             }
-            
+
             window.limpiarFormularioPerfil();
-            
+
             // Inyección de datos
             document.getElementById("rut").value = res.rut || "";
             document.getElementById("paciente").value = res.nombre || "";
@@ -4929,20 +4987,20 @@ window.cargarPerfilHistorico = async function(rutBuscado) {
             document.getElementById("diagnostico").value = res.diagnostico || "";
             document.getElementById("alergiaPaciente").value = res.alergia || "";
             document.getElementById("genero").value = res.genero || "";
-            
+
             const selectSrv = document.getElementById("servicio");
             selectSrv.innerHTML = `<option value="${res.servicio}">${res.servicio}</option>`;
             selectSrv.value = res.servicio;
-            
+
             const selectCama = document.getElementById("cama");
             selectCama.innerHTML = `<option value="${res.cama}">${res.cama}</option>`;
             selectCama.value = res.cama;
-            
+
             const inputsFecha = document.querySelectorAll(".header-fecha");
             if (res.fechasCabecera) {
                 res.fechasCabecera.forEach((fec, idx) => { if (inputsFecha[idx]) inputsFecha[idx].value = fec; });
             }
-            
+
             const filas = document.querySelectorAll("#grillaFila tr");
             if (res.medicamentos) {
                 res.medicamentos.forEach((med, idx) => {
@@ -4961,15 +5019,15 @@ window.cargarPerfilHistorico = async function(rutBuscado) {
                     }
                 });
             }
-            
+
             const sidebarSaldos = document.getElementById("sidebar-saldos-content");
-            if(sidebarSaldos) {
+            if (sidebarSaldos) {
                 sidebarSaldos.innerHTML = `<div style="padding: 20px; text-align: center; color: #ff9800; font-size: 14px; font-weight: bold;"><span class="material-icons-round" style="font-size: 42px; display:block; margin-bottom: 10px;">history</span>MODO HISTÓRICO ACTIVO<br><span style="font-size:12px; font-weight:normal; color:var(--text-muted); display:block; margin-top:10px;">El autoguardado y los cálculos están deshabilitados por seguridad clínica.</span></div>`;
             }
-            
+
             const status = document.getElementById("statusGuardado");
             if (status) status.innerHTML = `<span class="material-icons-round" style="font-size: 18px; color: #ff9800;">history</span> <span style="color: #ff9800;">Archivo de Solo Lectura</span>`;
-            
+
             window.mostrarToastFarmacia("Se ha cargado el perfil archivado del paciente.", "Cápsula del Tiempo");
         } else {
             alert("❌ No se encontró ningún egreso reciente con el RUT: " + rutBuscado);
@@ -4985,12 +5043,12 @@ window.cargarPerfilHistorico = async function(rutBuscado) {
 // ============================================================================
 window.pacientesCensoData = [];
 
-window.abrirModalCenso = async function() {
+window.abrirModalCenso = async function () {
     const modal = document.getElementById("modal-censo");
     if (modal) {
-        modal.style.display = "flex"; 
+        modal.style.display = "flex";
         setTimeout(() => modal.classList.add("show"), 10);
-        
+
         document.getElementById("censo-resumen-grid").innerHTML = "";
         document.getElementById("lista-censo-pacientes").innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 12px; margin-top: 30px;"><span class="material-icons-round" style="font-size: 32px; display: block; margin-bottom: 10px; color: var(--accent-green);">radar</span>Escaneando servicios del hospital en tiempo real...</div>`;
         document.getElementById("input-buscar-censo").value = "";
@@ -5012,7 +5070,7 @@ window.abrirModalCenso = async function() {
 
             let htmlResumen = "";
             const serviciosRadar = ["MEDICINA", "CIRUGIA", "UCI", "UTI", "UCM", "UCE", "MATERNIDAD", "PEDIATRIA", "PENSIONADO"];
-            
+
             serviciosRadar.forEach(srv => {
                 const ocupadas = conteoPorServicio[srv] || 0;
                 htmlResumen += `<div class="censo-card" style="cursor: pointer;" onclick="window.filtrarPorServicio('${srv}', this)">
@@ -5020,9 +5078,9 @@ window.abrirModalCenso = async function() {
                                   <div class="censo-card-data">${ocupadas} <span>pacientes</span></div>
                                 </div>`;
             });
-            
+
             document.getElementById("censo-resumen-grid").innerHTML = htmlResumen;
-            window.filtrarListaCenso(); 
+            window.filtrarListaCenso();
 
         } catch (err) {
             console.error("Error en el radar de camas:", err);
@@ -5031,14 +5089,14 @@ window.abrirModalCenso = async function() {
     }
 };
 
-window.cerrarModalCenso = function() {
+window.cerrarModalCenso = function () {
     const modal = document.getElementById("modal-censo");
     if (modal) { modal.classList.remove("show"); setTimeout(() => modal.style.display = "none", 400); }
 };
 
-window.filtrarPorServicio = function(servicio, elemento) {
+window.filtrarPorServicio = function (servicio, elemento) {
     const inputBuscar = document.getElementById("input-buscar-censo");
-    
+
     // Si vuelve a hacer clic en el mismo, deselecciona
     if (inputBuscar.value === servicio) {
         inputBuscar.value = "";
@@ -5053,17 +5111,17 @@ window.filtrarPorServicio = function(servicio, elemento) {
         elemento.style.background = "rgba(0, 230, 118, 0.1)";
         elemento.style.borderColor = "var(--accent-green)";
     }
-    window.filtrarListaCenso(); 
+    window.filtrarListaCenso();
 };
 
-window.filtrarListaCenso = function() {
+window.filtrarListaCenso = function () {
     const textoIngresado = document.getElementById("input-buscar-censo").value.trim();
     const terminoUpper = textoIngresado.toUpperCase();
     const terminoLower = window.quitarTildes(textoIngresado.toLowerCase());
     const listaUI = document.getElementById("lista-censo-pacientes");
-    
+
     let filtrados = window.pacientesCensoData;
-    
+
     if (textoIngresado) {
         filtrados = window.pacientesCensoData.filter(p => {
             const servLimpio = (p.servicio || "").trim().toUpperCase();
@@ -5073,17 +5131,17 @@ window.filtrarListaCenso = function() {
             const camaLimpia = window.quitarTildes((p.cama || "").toLowerCase());
 
             const esBusquedaPorServicioExacto = [
-                "CIRUGIA", "MATERNIDAD", "MEDICINA", "PEDIATRIA", "PENSIONADO", 
+                "CIRUGIA", "MATERNIDAD", "MEDICINA", "PEDIATRIA", "PENSIONADO",
                 "UCE", "UCI", "UCM", "UTI"
             ].includes(terminoUpper);
-            
+
             if (esBusquedaPorServicioExacto) {
                 return servLimpio === terminoUpper;
             } else {
-                return nombreLimpio.includes(terminoLower) || 
-                       rutLimpio.includes(terminoLower) || 
-                       camaLimpia.includes(terminoLower) ||
-                       servLower.includes(terminoLower);
+                return nombreLimpio.includes(terminoLower) ||
+                    rutLimpio.includes(terminoLower) ||
+                    camaLimpia.includes(terminoLower) ||
+                    servLower.includes(terminoLower);
             }
         });
     }
@@ -5107,9 +5165,9 @@ window.filtrarListaCenso = function() {
 };
 
 // TELETRANSPORTADOR DESDE EL BUSCADOR A LA CAMA
-window.irAPacienteCenso = function(servicioSeleccionado, camaSeleccionada) {
+window.irAPacienteCenso = function (servicioSeleccionado, camaSeleccionada) {
     window.cerrarModalCenso();
-    
+
     // Configuramos el select oculto para burlar la pantalla de inicio
     const selectInicio = document.getElementById("loginServicioSelect");
     if (selectInicio) {
@@ -5117,9 +5175,9 @@ window.irAPacienteCenso = function(servicioSeleccionado, camaSeleccionada) {
         if (!existe) selectInicio.appendChild(new Option(servicioSeleccionado, servicioSeleccionado));
         selectInicio.value = servicioSeleccionado;
     }
-    
-    window.comenzarTurnoWeb(); 
-    
+
+    window.comenzarTurnoWeb();
+
     // Tras la animación de entrada, fijamos la cama y descargamos los datos
     setTimeout(() => {
         const selectCama = document.getElementById("cama");
@@ -5129,5 +5187,5 @@ window.irAPacienteCenso = function(servicioSeleccionado, camaSeleccionada) {
             selectCama.value = camaSeleccionada;
             window.cargarTratamientoPacienteCama();
         }
-    }, 500); 
+    }, 500);
 };
