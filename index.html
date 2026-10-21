@@ -776,11 +776,19 @@
       </div>
 
       <!-- Contenedor dinámico de filas -->
-      <div id="lista-farmacos-conciliacion" style="flex: 1; overflow-y: auto; max-height: 420px; padding: 8px 10px; display: flex; flex-direction: column; gap: 8px;">
+      <div id="lista-farmacos-conciliacion" style="flex: 1; overflow-y: auto; max-height: 380px; padding: 8px 10px; display: flex; flex-direction: column; gap: 8px;">
+      </div>
+
+      <!-- Barra para agregar nuevos medicamentos al día actual -->
+      <div style="padding: 8px 10px 0 10px;">
+        <button type="button" onclick="window.agregarFilaNuevaConciliacion()" style="width: 100%; padding: 10px; border-radius: 10px; border: 1.5px dashed var(--accent-blue); background: rgba(64, 196, 255, 0.08); color: var(--accent-blue); font-weight: 800; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: 0.2s;">
+          <span class="material-icons-round" style="font-size: 18px;">add_circle</span>
+          AGREGAR NUEVO MEDICAMENTO A ESTE DÍA
+        </button>
       </div>
 
       <!-- Botones de acción -->
-      <div class="modal-actions" style="margin-top: 18px; justify-content: space-between; gap: 15px;">
+      <div class="modal-actions" style="margin-top: 14px; justify-content: space-between; gap: 15px;">
         <button type="button" class="btn-entendido" style="flex: 1;" onclick="cerrarModalConciliacion()">CANCELAR</button>
         <button type="button" class="btn-validar" style="flex: 1.5; background: linear-gradient(135deg, #00e676, #00c853); color: #000; font-weight: 900;" onclick="confirmarConciliacionDia()">
           <span class="material-icons-round" style="vertical-align: middle; font-size: 18px; margin-right: 4px;">done_all</span>

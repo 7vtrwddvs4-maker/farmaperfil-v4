@@ -778,3 +778,65 @@ body.light-theme .input-pill select {
     background: rgba(0, 230, 118, 0.15);
     color: var(--accent-green);
 }
+
+/* Forzar que las alertas de SweetAlert2 queden siempre por encima de los modales */
+.swal2-container {
+    z-index: 99999999 !important;
+}
+
+/* =========================================================
+   FILA DE NUEVO MEDICAMENTO DENTRO DE CONCILIACIÓN
+   ========================================================= */
+.item-conciliacion-nuevo {
+    display: grid;
+    grid-template-columns: 2.2fr 0.8fr 0.9fr 1.2fr;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(64, 196, 255, 0.07);
+    border: 1px solid rgba(64, 196, 255, 0.4);
+    transition: all 0.2s ease;
+}
+
+.grid-inputs-nuevo-concil {
+    display: grid;
+    grid-template-columns: 2.2fr 0.6fr 0.9fr 0.9fr;
+    gap: 6px;
+}
+
+.input-nuevo-concil {
+    width: 100%;
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--glass-border);
+    background: rgba(0, 0, 0, 0.3);
+    color: var(--text-main);
+    font-size: 12px;
+    font-weight: 700;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.input-nuevo-concil:focus {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 2px rgba(64, 196, 255, 0.25);
+}
+
+body.light-theme .input-nuevo-concil {
+    background: #ffffff;
+    border-color: #cbd5e1;
+    color: #0f172a;
+}
+
+.btn-eliminar-nuevo-concil {
+    padding: 7px 10px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+    border: 1px solid rgba(255, 82, 82, 0.4);
+    background: rgba(255, 82, 82, 0.15);
+    color: #ff5252;
+    text-transform: uppercase;
+}
