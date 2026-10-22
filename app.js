@@ -1979,22 +1979,80 @@ window.evaluarCDSSLocal = function (fila, medTexto, posoTexto, totalDiarioUnidad
     const rowId = fila.dataset.row;
     const firmaSD = `${rowId}|${medTexto.toUpperCase()}`;
 
+    const medLow = window.quitarTildes((medTexto || "").toLowerCase().trim());
+    const posoLow = (posoTexto || "").toLowerCase().trim();
+    const dosisLow = (dosisTexto || "").toLowerCase().trim();
+    const servicioActual = window.quitarTildes((document.getElementById("servicio")?.value || "").toLowerCase().trim());
+
+    // Detectar si el paciente está en unidad crítica: UCI, UTI, UCM / UTIM o REA Urgencia
+    const esPacienteUPC = ["uci", "uti", "ucm", "utim"].includes(servicioActual) ||
+        (servicioActual.includes("urgencia") && (document.getElementById("cama")?.value || "").toUpperCase().includes("REA"));
+
     celdaResultado.classList.remove("alerta-sobredosis");
     celdaResultado.style.color = "var(--text-main)";
     celdaResultado.style.fontWeight = "bold";
     if (contenedorAlerta) contenedorAlerta.style.display = "none";
 
-    if (posoTexto === "c/h" || posoTexto.includes("min") || posoTexto === "carga" || dosisTexto.includes("puff") || dosisTexto.includes("gota")) {
+    // 1. Excepciones directas (Infusiones continuas, cargas y gotas oftálmicas/orales)
+    if (posoLow === "c/h" || posoLow.includes("min") || posoLow === "carga" || dosisLow.includes("gota") || dosisLow.includes("aplicar")) {
         celdaResultado.value = "✅ OK";
         celdaResultado.style.color = "var(--accent-green)";
         return;
     }
 
+    // 2. MOTOR ESPECIAL DE INHALADORES (SALA BÁSICA vs. PACIENTE CRÍTICO UPC: UCI / UTI / UCM)
+    const listaInhaladores = ["salbutamol", "ipratropio", "budesonida", "formoterol", "fluticasona", "brexotide", "tiotropio", "olodaterol"];
+    const esInhalador = dosisLow.includes("puff") || listaInhaladores.some(inh => medLow.includes(inh));
+
+    if (esInhalador) {
+        const puffsPorVez = window.extraerSoloNumero(dosisLow);
+        const factorFrec = window.obtenerFactorFrecuenciaFront(posoLow);
+        const puffsDiarios = puffsPorVez * factorFrec;
+
+        // Topes diarios de Puffs según medicamento y unidad clínica (Sala vs UPC/Ventilado)
+        let maxPuffsPermitidos = esPacienteUPC ? 32 : 16; // Por defecto rescate (Salbutamol / Ipratropio)
+        if (medLow.includes("tiotropio") || medLow.includes("olodaterol")) {
+            maxPuffsPermitidos = esPacienteUPC ? 4 : 2;
+        } else if (medLow.includes("brexotide") || medLow.includes("fluticasona") || medLow.includes("budesonida") || medLow.includes("formoterol")) {
+            maxPuffsPermitidos = esPacienteUPC ? 16 : 8; // Corticoides inhalados / LABA
+        } else if (medLow.includes("salbutamol") || medLow.includes("ipratropio")) {
+            maxPuffsPermitidos = esPacienteUPC ? 48 : 16; // En UPC (UCI/UTI/UCM) permite hasta 8 puff c/4h (48/día) sin bloquear
+        }
+
+        if (puffsDiarios > maxPuffsPermitidos) {
+            if (window.sobredosisValidadas.has(firmaSD)) {
+                celdaResultado.value = "✅ VAL.";
+                celdaResultado.style.color = "var(--accent-green)";
+                return;
+            }
+            const msgInhalador = `Dosis inhalatoria elevada (${puffsDiarios} puffs/día). El límite habitual en ${esPacienteUPC ? "UPC" : "Sala Básica"} es de ${maxPuffsPermitidos} puffs/día. Riesgo de taquicardia, temblor o hipopotasemia.`;
+            celdaResultado.classList.add("alerta-sobredosis");
+            celdaResultado.value = "⚠️ SOBREDOSIS";
+            if (contenedorAlerta) {
+                contenedorAlerta.innerHTML = "⚠️ ALERTA: " + msgInhalador;
+                contenedorAlerta.style.background = "#ff5252";
+                contenedorAlerta.style.display = "block";
+            }
+            if (!silencioso && !window.alertasEmitidas.has(firmaSD)) {
+                window.alertasEmitidas.add(firmaSD);
+                window.tipoAlertaActual = "SOBREDOSIS";
+                window.filaAlertaActiva = rowId;
+                window.mostrarModalAlerta(medTexto, msgInhalador);
+            }
+            return;
+        } else {
+            window.alertasEmitidas.delete(firmaSD);
+            celdaResultado.value = "✅ OK";
+            celdaResultado.style.color = "var(--accent-green)";
+            return;
+        }
+    }
+
+    // 3. EVALUACIÓN ESTÁNDAR DEL CATÁLOGO CDSS (COMPRIMIDOS, AMPOLLAS, VIALES)
     if (window.datosGlobales && window.datosGlobales.catalogo) {
-        const medLimpio = window.quitarTildes(medTexto.toLowerCase().trim());
         const dataCDSS = window.datosGlobales.catalogo.find(m => {
             const catLimpio = window.quitarTildes((m.medicamento || "").toLowerCase().trim());
-            return catLimpio === medLimpio || (catLimpio && medLimpio.includes(catLimpio));
+            return catLimpio === medLow || (catLimpio && medLow.includes(catLimpio));
         });
 
         if (dataCDSS) {
