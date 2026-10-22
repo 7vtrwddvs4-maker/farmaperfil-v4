@@ -94,7 +94,7 @@
                     <input type="text" id="regRut" class="login-input" placeholder="RUT (Ej: 11111111-1)"
                         autocomplete="off" style="margin-bottom: 10px;">
 
-                    <select id="regRol" class="login-input"
+                    <select id="regRol" class="login-input" onchange="window.toggleServiciosRegistroQF(this.value)"
                         style="margin-bottom: 10px; cursor: pointer; text-align-last: center;">
                         <option value="" disabled selected hidden>Seleccione su Cargo...</option>
                         <option value="TENS">TENS</option>
@@ -102,6 +102,11 @@
                         <option value="Enfermero(a)">Enfermero(a)</option>
                         <option value="Médico">Médico</option>
                     </select>
+
+                    <div id="contenedorRegServiciosQF" style="display: none; text-align: left; background: rgba(0,0,0,0.25); border: 1px solid var(--glass-border); border-radius: 10px; padding: 10px; margin-bottom: 12px; max-height: 130px; overflow-y: auto;">
+                        <div style="font-size: 10px; font-weight: 800; color: var(--accent-blue); text-transform: uppercase; margin-bottom: 6px;">Servicios habituales a su cargo (QF):</div>
+                        <div id="listaCheckboxesRegQF" style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 11px;"></div>
+                    </div>
 
                     <input type="password" id="regPin" class="login-input" placeholder="Cree un PIN de 4 números"
                         maxlength="4" inputmode="numeric" autocomplete="off" style="margin-bottom: 15px;">
@@ -121,9 +126,18 @@
                     <span class="material-icons-round"
                         style="font-size: 64px; color: var(--accent-green);">local_hospital</span>
                     <h2 id="welcomeUserName" style="text-transform: uppercase; font-size: 20px;">¡BIENVENIDO!</h2>
-                    <p>Seleccione el servicio donde trabajará hoy:</p>
+                    <p>Seleccione el servicio donde iniciará hoy:</p>
                     <select id="loginServicioSelect" class="login-input"
                         style="text-align-last: center; font-weight: bold; cursor: pointer;"></select>
+
+                    <div id="panelTurnoServiciosQF" style="display: none; text-align: left; background: rgba(0,0,0,0.25); border: 1px solid var(--accent-blue); border-radius: 12px; padding: 10px 12px; margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <span style="font-size: 10px; font-weight: 900; color: var(--accent-blue); text-transform: uppercase;">🔔 Servicios a visar hoy (QF):</span>
+                            <button type="button" onclick="window.marcarTodosServiciosQF()" style="background: none; border: none; color: var(--accent-green); font-size: 10px; font-weight: 800; cursor: pointer; padding: 0;">Todos / Ninguno</button>
+                        </div>
+                        <div id="listaCheckboxesTurnoQF" style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; font-size: 11px; max-height: 110px; overflow-y: auto;"></div>
+                    </div>
+
                     <button id="btnComenzarTurno" class="btn-login"
                         style="background: var(--accent-green); color: #000;" onclick="comenzarTurnoWeb()">INICIAR
                         TURNO</button>
@@ -273,6 +287,12 @@
                     <div id="displayUserRole" class="user-role"></div>
                     <button class="btn-logout" onclick="cerrarSesion()">Cerrar Sesión (Cambio de Turno)</button>
                 </div>
+
+                <button class="theme-toggle-btn" id="btnCampanaVisacion" style="right: 105px;" onclick="window.abrirModalBandejaVisacion()"
+                    title="Bandeja de Visación y Autorizaciones en Vivo">
+                    <span class="material-icons-round" id="iconoCampanaVisacion">notifications</span>
+                    <span id="badgeCampanaVisacion" style="display: none; position: absolute; top: -4px; right: -4px; background: var(--accent-red); color: white; font-size: 10px; font-weight: 900; padding: 2px 5px; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.4);">0</span>
+                </button>
 
                 <button class="theme-toggle-btn" style="right: 60px;" onclick="volverAlMenuPrincipal()"
                     title="Volver al Menú Principal">
@@ -727,6 +747,40 @@
         <div id="despachoFooterActions" class="footer-actions"></div>
       </div>
       
+    </div>
+  </div>
+
+  <!-- ================================================================= -->
+  <!-- 9. MODAL DE BANDEJA DE VISACIÓN Y NOTIFICACIONES EN TIEMPO REAL   -->
+  <!-- ================================================================= -->
+  <div id="modal-visacion-qf" class="modal-overlay" style="z-index: 9999999; display: none;">
+    <div class="modal-container" style="width: 780px; max-width: 96vw; max-height: 88vh; display: flex; flex-direction: column;">
+      
+      <div class="modal-header" style="justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-border); padding-bottom: 15px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span class="material-icons-round icon" style="color: var(--accent-blue); font-size: 38px; background: rgba(64,196,255,0.12); padding: 10px; border-radius: 50%;">verified_user</span>
+          <div>
+            <div id="titulo-modal-visacion" style="font-size: 19px; font-weight: 900; color: var(--text-main); text-transform: uppercase;">
+              CENTRO DE VISACIÓN FARMACOTERAPÉUTICA
+            </div>
+            <div id="subtitulo-modal-visacion" style="color: var(--text-muted); font-size: 12px; margin-top: 2px;">
+              Solicitudes de medicamentos sujetos a protocolo y respuestas en tiempo real.
+            </div>
+          </div>
+        </div>
+        <button type="button" onclick="window.cerrarModalBandejaVisacion()" style="background: rgba(255,82,82,0.15); color: var(--accent-red); border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+
+      <!-- Lista dinámica de solicitudes -->
+      <div id="contenedor-items-visacion" style="flex: 1; overflow-y: auto; max-height: 460px; padding: 10px 5px; display: flex; flex-direction: column; gap: 12px;">
+      </div>
+
+      <div class="modal-actions" style="margin-top: 10px;">
+        <button type="button" class="btn-entendido" style="width: 100%;" onclick="window.cerrarModalBandejaVisacion()">CERRAR BANDEJA</button>
+      </div>
+
     </div>
   </div>
 

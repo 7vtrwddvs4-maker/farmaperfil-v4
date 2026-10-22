@@ -1,7 +1,7 @@
 // ============================================================================
 // 🚀 FARMAPERFIL v4.0 - MOTOR INTEGRAL FIRESTORE + CLÍNICA AVANZADA
 // ============================================================================
-import { doc, getDoc, setDoc, deleteDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { doc, getDoc, setDoc, deleteDoc, updateDoc, collection, getDocs, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // ============================================================================
 // 1. VARIABLES GLOBALES Y DICCIONARIOS CLÍNICOS
@@ -233,6 +233,56 @@ window.mostrarToastFarmacia = function (mensaje, titulo) {
 // ============================================================================
 // 3. AUTENTICACIÓN, REGISTRO Y CONFIGURACIÓN MAESTRA (FIRESTORE)
 // ============================================================================
+window.LISTA_SERVICIOS_BASE = ["MEDICINA", "CIRUGIA", "UCI", "UTI", "UCM", "UCE", "MATERNIDAD", "PEDIATRIA", "PENSIONADO", "URGENCIA ADULTO HOSPITALIZADO"];
+
+window.toggleServiciosRegistroQF = function (rolElegido) {
+    const cont = document.getElementById("contenedorRegServiciosQF");
+    const lista = document.getElementById("listaCheckboxesRegQF");
+    if (!cont || !lista) return;
+
+    if (rolElegido === "Químico Farmacéutico") {
+        const servicios = (window.datosGlobales?.servicios?.length > 0) ? window.datosGlobales.servicios : window.LISTA_SERVICIOS_BASE;
+        lista.innerHTML = servicios.map(s => `
+            <label style="display:flex; align-items:center; gap:5px; cursor:pointer; color:var(--text-main);">
+                <input type="checkbox" class="chk-reg-srv-qf" value="${s.toUpperCase()}" checked style="width:14px; height:14px;">
+                <span>${s}</span>
+            </label>
+        `).join("");
+        cont.style.display = "block";
+    } else {
+        cont.style.display = "none";
+    }
+};
+
+window.prepararPanelTurnoQF = function (datosUsuario) {
+    const panelQF = document.getElementById("panelTurnoServiciosQF");
+    const lista = document.getElementById("listaCheckboxesTurnoQF");
+    if (!panelQF || !lista) return;
+
+    if (datosUsuario && datosUsuario.rol === "Químico Farmacéutico") {
+        const servicios = (window.datosGlobales?.servicios?.length > 0) ? window.datosGlobales.servicios : window.LISTA_SERVICIOS_BASE;
+        const asignadosPrevios = (datosUsuario.serviciosAsignados || servicios).map(s => s.toUpperCase());
+        lista.innerHTML = servicios.map(s => {
+            const checked = asignadosPrevios.includes(s.toUpperCase()) ? "checked" : "";
+            return `
+                <label style="display:flex; align-items:center; gap:5px; cursor:pointer; color:var(--text-main);">
+                    <input type="checkbox" class="chk-turno-srv-qf" value="${s.toUpperCase()}" ${checked} style="width:14px; height:14px;">
+                    <span>${s}</span>
+                </label>
+            `;
+        }).join("");
+        panelQF.style.display = "block";
+    } else {
+        panelQF.style.display = "none";
+    }
+};
+
+window.marcarTodosServiciosQF = function () {
+    const checks = Array.from(document.querySelectorAll(".chk-turno-srv-qf"));
+    const todosMarcados = checks.every(c => c.checked);
+    checks.forEach(c => c.checked = !todosMarcados);
+};
+
 window.intentarLogin = async function () {
     const rutInput = document.getElementById("loginRut").value.trim().toUpperCase();
     const pinInput = document.getElementById("loginPin").value.trim();
@@ -259,6 +309,7 @@ window.intentarLogin = async function () {
                 sessionStorage.setItem("FarmaPerfil_Sesion", JSON.stringify(datosUsuario));
                 document.getElementById("loginStepCredentials").style.display = "none";
                 document.getElementById("welcomeUserName").innerText = `¡HOLA, ${datosUsuario.nombre}!`;
+                window.prepararPanelTurnoQF(datosUsuario);
                 document.getElementById("loginStepService").style.display = "block";
             } else {
                 errorDiv.innerText = "❌ PIN de Seguridad incorrecto.";
@@ -295,6 +346,8 @@ window.ocultarRegistro = function () {
     document.getElementById("regRut").value = "";
     document.getElementById("regRol").value = "";
     document.getElementById("regPin").value = "";
+    const contQF = document.getElementById("contenedorRegServiciosQF");
+    if (contQF) contQF.style.display = "none";
 };
 
 window.olvidePin = function () {
@@ -325,6 +378,16 @@ window.ejecutarRegistro = async function () {
         return;
     }
 
+    let serviciosAsignados = [];
+    if (rol === "Químico Farmacéutico") {
+        serviciosAsignados = Array.from(document.querySelectorAll(".chk-reg-srv-qf:checked")).map(c => c.value);
+        if (serviciosAsignados.length === 0) {
+            errorDiv.innerText = "⚠️ Seleccione al menos un servicio a su cargo.";
+            errorDiv.style.display = "block";
+            return;
+        }
+    }
+
     errorDiv.style.display = "none";
     btn.innerText = "REGISTRANDO...";
     btn.disabled = true;
@@ -339,7 +402,7 @@ window.ejecutarRegistro = async function () {
             btn.disabled = false;
             return;
         }
-        await setDoc(refUser, { nombre, rut, rol, pin, fechaCreacion: new Date().toISOString() });
+        await setDoc(refUser, { nombre, rut, rol, pin, serviciosAsignados, fechaCreacion: new Date().toISOString() });
         alert("✅ Cuenta creada exitosamente.");
         window.ocultarRegistro();
         document.getElementById("loginRut").value = rut;
@@ -556,6 +619,17 @@ window.comenzarTurnoWeb = function () {
     window.actualizarDropdownCamas("servicio", "cama");
 
     const usuario = JSON.parse(sessionStorage.getItem("FarmaPerfil_Sesion") || "{}");
+    if (usuario.rol === "Químico Farmacéutico") {
+        const marcadosHoy = Array.from(document.querySelectorAll(".chk-turno-srv-qf:checked")).map(c => c.value);
+        if (marcadosHoy.length > 0) {
+            usuario.serviciosAsignados = marcadosHoy;
+            sessionStorage.setItem("FarmaPerfil_Sesion", JSON.stringify(usuario));
+            if (usuario.rut) {
+                updateDoc(doc(window.db, "usuarios", usuario.rut), { serviciosAsignados: marcadosHoy }).catch(() => {});
+            }
+        }
+    }
+
     const overlay = document.getElementById("loginOverlay");
     overlay.style.opacity = "0";
     setTimeout(() => { overlay.style.display = "none"; }, 500);
@@ -563,6 +637,7 @@ window.comenzarTurnoWeb = function () {
     if (usuario.nombre) document.getElementById("displayUserName").innerText = usuario.nombre;
     if (usuario.rol) document.getElementById("displayUserRole").innerText = usuario.rol;
 
+    window.iniciarRadarVisacionTiempoReal();
     window.cargarTratamientoPacienteCama();
 };
 
@@ -716,7 +791,9 @@ window.cargarTratamientoPacienteCama = async function () {
 
         setTimeout(() => {
             let rutActual = document.getElementById("rut").value.trim() || idCama;
-            window.medicamentosPendientes = JSON.parse(localStorage.getItem("pendientes_" + rutActual)) || {};
+            const pendientesNube = (docSnap && docSnap.exists() && docSnap.data().medicamentosPendientes) ? docSnap.data().medicamentosPendientes : {};
+            const pendientesLocal = JSON.parse(localStorage.getItem("pendientes_" + rutActual)) || {};
+            window.medicamentosPendientes = { ...pendientesLocal, ...pendientesNube };
 
             window.actualizarSaldosYSidebar();
             window.escanearInteraccionesGlobales();
@@ -749,6 +826,7 @@ window.ejecutarGuardadoSilencioso = async function (servicio, cama) {
             alergia: document.getElementById("alergiaPaciente") ? document.getElementById("alergiaPaciente").value.trim() : "",
             fechasCabecera: [],
             medicamentos: [],
+            medicamentosPendientes: window.medicamentosPendientes || {},
             ultimaModificacion: new Date().toISOString()
         };
 
@@ -2345,8 +2423,24 @@ window.escanearRestringidos = function () {
             } else if (estadoActual === "PENDIENTE") {
                 window.alertasEmitidas.add(firmaRestringido);
                 celdaAlerta.classList.add("alerta-interaccion");
-                celdaAlerta.value = "⏳ PENDIENTE";
+                celdaAlerta.value = "⏳ PENDIENTE QF";
                 celdaAlerta.style.color = "#ff9800";
+                requiereActualizarSidebar = true;
+            } else if (estadoActual === "RECHAZADO") {
+                window.alertasEmitidas.add(firmaRestringido);
+                celdaAlerta.classList.remove("alerta-interaccion");
+                celdaAlerta.classList.add("alerta-sobredosis");
+                celdaAlerta.value = "❌ RECHAZADO QF";
+                celdaAlerta.style.color = "var(--accent-red)";
+                window.medicamentosPendientes[firmaRestringido] = {
+                    estado: "RECHAZADO",
+                    rowId,
+                    medicamento: nombreMed,
+                    especialidad: protocolo.especialidad,
+                    medicos: protocolo.medicos,
+                    tipo: tipoRestriccion,
+                    observacionQF: registroExistente?.observacionQF || "No autorizado por QF"
+                };
                 requiereActualizarSidebar = true;
             }
         }
@@ -2369,14 +2463,17 @@ window.actualizarSidebarPendientes = function () {
 
     for (let firma in window.medicamentosPendientes) {
         const med = window.medicamentosPendientes[firma];
-        if (med.estado === "PENDIENTE" || med.estado === "ACEPTADO") {
+        if (med.estado === "PENDIENTE" || med.estado === "ACEPTADO" || med.estado === "RECHAZADO") {
             hayEspeciales = true;
             let isAceptado = med.estado === "ACEPTADO";
-            let colorBorde = isAceptado ? "var(--accent-green)" : "#ff9800";
-            let bgFondo = isAceptado ? "rgba(0, 230, 118, 0.05)" : "rgba(255, 152, 0, 0.05)";
-            let badgeColor = isAceptado ? "var(--accent-green)" : "#ff9800";
-            let textoBadge = isAceptado ? "AUTORIZADO" : "PENDIENTE";
-            let textoFooter = isAceptado ? `Aprobado: ${med.especialidad || 'Especialista'}` : `Requiere autorización Médica`;
+            let isRechazado = med.estado === "RECHAZADO";
+            let colorBorde = isAceptado ? "var(--accent-green)" : (isRechazado ? "var(--accent-red)" : "#ff9800");
+            let bgFondo = isAceptado ? "rgba(0, 230, 118, 0.05)" : (isRechazado ? "rgba(255, 82, 82, 0.08)" : "rgba(255, 152, 0, 0.05)");
+            let badgeColor = isAceptado ? "var(--accent-green)" : (isRechazado ? "var(--accent-red)" : "#ff9800");
+            let textoBadge = isAceptado ? "AUTORIZADO" : (isRechazado ? "RECHAZADO QF" : "PENDIENTE QF");
+            let textoFooter = isAceptado
+                ? `Aprobado: ${med.medicoAutorizador || med.especialidad || 'Especialista'}`
+                : (isRechazado ? `Motivo QF: <b>${med.observacionQF || 'Sin autorización'}</b>` : `Enviado a visación QF`);
 
             if (med.tipo === "ORDEN_COMPRA" && isAceptado) {
                 textoFooter = `Orden de Compra: <b>${med.diasOC || 0} días</b> autorizados`;
@@ -2493,12 +2590,36 @@ window.mostrarModalRestringido = function (firma) {
         const accionesModal = document.querySelector("#modal-overlay .modal-actions");
         if (accionesModal) accionesModal.insertBefore(btnPendiente, accionesModal.querySelector(".btn-entendido"));
     }
-    btnPendiente.textContent = "DEJAR PENDIENTE";
+    btnPendiente.textContent = "DEJAR PENDIENTE (ENVIAR A QF)";
     btnPendiente.style.display = "block";
-    btnPendiente.onclick = function () {
+    btnPendiente.onclick = async function () {
         window.medicamentosPendientes[firma].estado = "PENDIENTE";
+        const rowId = firma.split('|')[0];
+        const filaUI = document.querySelector(`tr[data-row="${rowId}"]`);
+        if (filaUI) {
+            const inputs = filaUI.querySelectorAll("input");
+            inputs[4].classList.add("alerta-interaccion");
+            inputs[4].value = "⏳ PENDIENTE QF";
+            inputs[4].style.color = "#ff9800";
+            // Asegurar que no queden unidades sin autorizar en el día activo
+            let colActiva = 0;
+            const headersF = document.querySelectorAll(".header-fecha");
+            for (let i = 0; i < 10; i++) { if (headersF[i].value.trim() !== "") colActiva = i; }
+            if (inputs[5 + colActiva] && inputs[5 + colActiva].dataset.manual !== "true") {
+                inputs[5 + colActiva].value = "";
+                window.syncCheckUI(inputs[5 + colActiva]);
+            }
+        }
+        let idCamaFallback = ((document.getElementById("servicio").value || "sin") + "_" + (document.getElementById("cama").value || "sincama")).toLowerCase().replace(/\s+/g, '_');
+        let rutAct = document.getElementById("rut").value.trim() || idCamaFallback;
+        localStorage.setItem("pendientes_" + rutAct, JSON.stringify(window.medicamentosPendientes));
+        localStorage.setItem("pendientes_" + idCamaFallback, JSON.stringify(window.medicamentosPendientes));
+
         window.actualizarSidebarPendientes();
         window.resetearCerrarModal();
+        window.programarAutoguardado();
+
+        await window.enviarSolicitudVisacionQF(firma);
     };
 
     window.tipoAlertaActual = "RESTRINGIDO";
@@ -5252,4 +5373,546 @@ window.irAPacienteCenso = function (servicioSeleccionado, camaSeleccionada) {
             window.cargarTratamientoPacienteCama();
         }
     }, 500);
+};
+
+// ============================================================================
+// 18. SISTEMA DE VISACIÓN FARMACOTERAPÉUTICA EN TIEMPO REAL (TENS <-> QF)
+// ============================================================================
+window.unsubscribeVisacionSnapshot = null;
+window.solicitudesVisacionCache = [];
+window.idsSolicitudesConocidasQF = new Set();
+window.cargaInicialSnapshotCompleta = false;
+
+window.enviarSolicitudVisacionQF = async function (firma) {
+    try {
+        const dataPend = window.medicamentosPendientes[firma];
+        if (!dataPend) return;
+
+        const servicio = (document.getElementById("servicio")?.value || "").trim().toUpperCase();
+        const cama = (document.getElementById("cama")?.value || "").trim();
+        if (!servicio || !cama) return;
+
+        const idCamaDoc = `${servicio.toLowerCase()}_${cama.toLowerCase()}`.replace(/\s+/g, '_');
+        const rowId = String(dataPend.rowId);
+        const filaUI = document.querySelector(`#grillaFila tr[data-row="${rowId}"]`);
+        const inputs = filaUI ? filaUI.querySelectorAll("input") : [];
+
+        const medTexto = inputs[0] ? inputs[0].value.trim() : dataPend.medicamento;
+        const viaTexto = inputs[1] ? inputs[1].value.trim() : "";
+        const dosisTexto = inputs[2] ? inputs[2].value.trim() : "";
+        const posoTexto = inputs[3] ? inputs[3].value.trim() : "";
+
+        const usuario = JSON.parse(sessionStorage.getItem("FarmaPerfil_Sesion") || "{}");
+        const idSolicitud = `${idCamaDoc}_fila_${rowId}_${window.quitarTildes(medTexto.toLowerCase()).replace(/[^a-z0-9]/g, '_')}`;
+
+        const solicitudObj = {
+            idSolicitud,
+            idCamaDoc,
+            servicio,
+            cama,
+            paciente: (document.getElementById("paciente")?.value || "PACIENTE SIN NOMBRE").trim().toUpperCase(),
+            rutPaciente: (document.getElementById("rut")?.value || "").trim(),
+            diagnostico: (document.getElementById("diagnostico")?.value || "Sin diagnóstico registrado").trim(),
+            rowId,
+            firmaOriginal: firma,
+            medicamento: medTexto,
+            via: viaTexto,
+            dosis: dosisTexto,
+            posologia: posoTexto,
+            tipoRestriccion: dataPend.tipo || "ESTANDAR",
+            especialidadRequerida: dataPend.especialidad || "Especialista",
+            medicosSugeridos: dataPend.medicos || [],
+            solicitadoPorNombre: usuario.nombre || "TENS Farmacia",
+            solicitadoPorRut: usuario.rut || "",
+            estado: "PENDIENTE",
+            resueltoPorQF: "",
+            medicoAutorizador: "",
+            diasOC: 0,
+            observacionQF: "",
+            notificadoAlTens: false,
+            timestamp: Date.now()
+        };
+
+        await setDoc(doc(window.db, "solicitudes_qf", idSolicitud), solicitudObj);
+        window.mostrarToastFarmacia(
+            `Solicitud enviada en vivo al Químico Farmacéutico (${servicio} - ${cama}).`,
+            "📤 Enviado a Visación QF"
+        );
+    } catch (err) {
+        console.error("Error enviando solicitud a QF:", err);
+    }
+};
+
+// Motor de Audio Clínico Persistente (Desbloquea Autoplay en Safari y Chrome macOS)
+window.audioCtxClinico = null;
+
+window.obtenerAudioContextActivo = function () {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return null;
+    if (!window.audioCtxClinico) {
+        window.audioCtxClinico = new AudioCtx();
+    }
+    if (window.audioCtxClinico.state === "suspended") {
+        window.audioCtxClinico.resume();
+    }
+    return window.audioCtxClinico;
+};
+
+// Desbloquear el canal de audio del navegador apenas el usuario haga su primer clic o presione una tecla
+["click", "keydown", "touchstart"].forEach(evento => {
+    document.addEventListener(evento, function desbloquearAudio() {
+        const ctx = window.obtenerAudioContextActivo();
+        if (ctx && ctx.state === "running") {
+            document.removeEventListener(evento, desbloquearAudio);
+        }
+    }, { once: false, passive: true });
+});
+
+window.reproducirSonidoClinico = async function (tipo = "NUEVA_SOLICITUD") {
+    try {
+        const ctx = window.obtenerAudioContextActivo();
+        if (!ctx) return;
+        if (ctx.state === "suspended") {
+            await ctx.resume();
+        }
+
+        const tocarNota = (frecuencia, inicioSeg, duracionSeg, tipoOnda = "triangle", volumen = 0.42) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = tipoOnda;
+            osc.frequency.setValueAtTime(frecuencia, ctx.currentTime + inicioSeg);
+
+            gain.gain.setValueAtTime(0.001, ctx.currentTime + inicioSeg);
+            gain.gain.linearRampToValueAtTime(volumen, ctx.currentTime + inicioSeg + 0.025);
+            gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + inicioSeg + duracionSeg);
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(ctx.currentTime + inicioSeg);
+            osc.stop(ctx.currentTime + inicioSeg + duracionSeg);
+        };
+
+        if (tipo === "NUEVA_SOLICITUD") {
+            // Doble chime clínico brillante (Mi5 -> Si5) para alertar al QF
+            tocarNota(659.25, 0, 0.22, "triangle", 0.45);
+            tocarNota(987.77, 0.16, 0.45, "triangle", 0.45);
+        } else if (tipo === "APROBADO") {
+            // Tríada ascendente (Do5 -> Mi5 -> Sol5) para confirmar aprobación al TENS
+            tocarNota(523.25, 0, 0.15, "triangle", 0.40);
+            tocarNota(659.25, 0.12, 0.15, "triangle", 0.40);
+            tocarNota(783.99, 0.24, 0.40, "triangle", 0.45);
+        } else if (tipo === "RECHAZADO") {
+            // Doble pulso grave de alerta clínica (La4 -> Mi4)
+            tocarNota(440.00, 0, 0.20, "sawtooth", 0.30);
+            tocarNota(329.63, 0.22, 0.38, "sawtooth", 0.30);
+        }
+    } catch (e) {
+        console.warn("No se pudo reproducir el sonido clínico:", e);
+    }
+};
+
+window.iniciarRadarVisacionTiempoReal = function () {
+    if (window.unsubscribeVisacionSnapshot) {
+        window.unsubscribeVisacionSnapshot();
+    }
+
+    const colRef = collection(window.db, "solicitudes_qf");
+    window.cargaInicialSnapshotCompleta = false;
+
+    window.unsubscribeVisacionSnapshot = onSnapshot(colRef, (snapshot) => {
+        const usuario = JSON.parse(sessionStorage.getItem("FarmaPerfil_Sesion") || "{}");
+        if (!usuario || !usuario.rol) return;
+
+        const esQF = usuario.rol === "Químico Farmacéutico";
+        const misServiciosQF = (usuario.serviciosAsignados || window.LISTA_SERVICIOS_BASE).map(s => s.toUpperCase());
+
+        const listaActual = [];
+        snapshot.forEach(docSnap => listaActual.push(docSnap.data()));
+        listaActual.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        window.solicitudesVisacionCache = listaActual;
+
+        // Evaluar cambios en tiempo real (Toasts, Sonido Clínico y actualización automática de celdas)
+        snapshot.docChanges().forEach(change => {
+            const sol = change.doc.data();
+            const firmaTiempo = `${sol.idSolicitud}_${sol.timestamp}`;
+
+            // 1. LADO QUÍMICO FARMACÉUTICO: Detectar solicitud pendiente (nueva o reenviada) en sus servicios
+            if (esQF && sol.estado === "PENDIENTE" && misServiciosQF.includes((sol.servicio || "").toUpperCase())) {
+                if (window.cargaInicialSnapshotCompleta && (change.type === "added" || change.type === "modified") && !window.idsSolicitudesConocidasQF.has(firmaTiempo)) {
+                    window.reproducirSonidoClinico("NUEVA_SOLICITUD");
+                    window.mostrarToastFarmacia(
+                        `<b>${sol.medicamento.toUpperCase()}</b> (${sol.dosis} ${sol.posologia})<br>${sol.servicio} - ${sol.cama} · Paciente: ${sol.paciente}<br><small>Solicitado por: ${sol.solicitadoPorNombre}</small>`,
+                        "🔔 NUEVA SOLICITUD DE VISACIÓN"
+                    );
+                }
+                window.idsSolicitudesConocidasQF.add(firmaTiempo);
+            }
+
+            // 2. LADO TENS / SOLICITANTE: Detectar cuando el QF resuelve (ACEPTADO / RECHAZADO)
+            if (change.type === "modified") {
+                const esMiSolicitud = (sol.solicitadoPorRut && sol.solicitadoPorRut === usuario.rut) || (sol.solicitadoPorNombre === usuario.nombre);
+                const camaActualAbierta = `${(document.getElementById("servicio")?.value || "").toLowerCase()}_${(document.getElementById("cama")?.value || "").toLowerCase()}`.replace(/\s+/g, '_');
+                const tengoEsaCamaAbierta = camaActualAbierta === sol.idCamaDoc;
+
+                if ((esMiSolicitud || tengoEsaCamaAbierta) && !sol.notificadoAlTens && (sol.estado === "ACEPTADO" || sol.estado === "RECHAZADO")) {
+                    if (sol.estado === "ACEPTADO") {
+                        window.reproducirSonidoClinico("APROBADO");
+                        window.mostrarToastFarmacia(
+                            `✅ <b>${sol.medicamento.toUpperCase()}</b> fue <b>APROBADO</b> por QF ${sol.resueltoPorQF}<br>${sol.servicio} - ${sol.cama} (${sol.paciente})<br>${sol.observacionQF ? `Nota: ${sol.observacionQF}` : `Autoriza: ${sol.medicoAutorizador}`}`,
+                            "VISACIÓN APROBADA POR QF"
+                        );
+                    } else if (sol.estado === "RECHAZADO") {
+                        window.reproducirSonidoClinico("RECHAZADO");
+                        window.mostrarToastFarmacia(
+                            `❌ <b>${sol.medicamento.toUpperCase()}</b> fue <b>RECHAZADO</b> por QF ${sol.resueltoPorQF}<br>${sol.servicio} - ${sol.cama} (${sol.paciente})<br>Motivo: <b>${sol.observacionQF || "Sin autorización"}</b>`,
+                            "VISACIÓN RECHAZADA POR QF"
+                        );
+                    }
+
+                    // Marcar como notificado en Firestore
+                    updateDoc(doc(window.db, "solicitudes_qf", sol.idSolicitud), { notificadoAlTens: true }).catch(() => {});
+                }
+
+                // Si el paciente está abierto en este momento en pantalla, aplicar el cambio en vivo sin recargar
+                if (tengoEsaCamaAbierta && (sol.estado === "ACEPTADO" || sol.estado === "RECHAZADO")) {
+                    window.aplicarResolucionQFEnCamaAbierta(sol);
+                }
+            }
+        });
+
+        window.cargaInicialSnapshotCompleta = true;
+        window.actualizarBadgeCampanaVisacion();
+
+        const modalVis = document.getElementById("modal-visacion-qf");
+        if (modalVis && modalVis.classList.contains("show")) {
+            window.renderizarBandejaVisacion();
+        }
+    });
+};
+
+window.aplicarResolucionQFEnCamaAbierta = function (sol) {
+    const firma = sol.firmaOriginal || `${sol.rowId}|${sol.medicamento.toLowerCase()}`;
+    const filaUI = document.querySelector(`#grillaFila tr[data-row="${sol.rowId}"]`);
+
+    if (!window.medicamentosPendientes[firma]) {
+        window.medicamentosPendientes[firma] = {
+            rowId: sol.rowId,
+            medicamento: sol.medicamento.toLowerCase(),
+            especialidad: sol.especialidadRequerida,
+            medicos: sol.medicosSugeridos || [],
+            tipo: sol.tipoRestriccion || "ESTANDAR"
+        };
+    }
+
+    window.medicamentosPendientes[firma].estado = sol.estado;
+    window.medicamentosPendientes[firma].medicoAutorizador = sol.medicoAutorizador || "";
+    window.medicamentosPendientes[firma].observacionQF = sol.observacionQF || "";
+    if (sol.diasOC > 0) window.medicamentosPendientes[firma].diasOC = sol.diasOC;
+
+    let idCamaFallback = sol.idCamaDoc;
+    let rutAct = document.getElementById("rut")?.value.trim() || idCamaFallback;
+    localStorage.setItem("pendientes_" + rutAct, JSON.stringify(window.medicamentosPendientes));
+    localStorage.setItem("pendientes_" + idCamaFallback, JSON.stringify(window.medicamentosPendientes));
+
+    if (filaUI) {
+        const inputs = filaUI.querySelectorAll("input");
+        if (sol.estado === "ACEPTADO") {
+            if (sol.tipoRestriccion === "ORDEN_COMPRA" && sol.diasOC > 0) {
+                inputs[3].value = inputs[3].value.replace(/\s*\[OC:\s*\d+\]/ig, "") + ` [OC:${sol.diasOC}]`;
+            }
+            inputs[4].classList.remove("alerta-interaccion", "alerta-sobredosis");
+            inputs[4].value = "✅ AUTORIZADO";
+            inputs[4].style.color = "var(--accent-green)";
+            // Recalcular automáticamente las unidades a despachar hoy
+            inputs[3].dispatchEvent(new Event("change", { bubbles: true }));
+        } else if (sol.estado === "RECHAZADO") {
+            inputs[4].classList.remove("alerta-interaccion");
+            inputs[4].classList.add("alerta-sobredosis");
+            inputs[4].value = "❌ RECHAZADO QF";
+            inputs[4].style.color = "var(--accent-red)";
+            // Bloquear la celda del día activo con S/I para prevenir dispensación errónea
+            let colActiva = 0;
+            const headersF = document.querySelectorAll(".header-fecha");
+            for (let i = 0; i < 10; i++) { if (headersF[i].value.trim() !== "") colActiva = i; }
+            if (inputs[5 + colActiva]) {
+                inputs[5 + colActiva].value = "S/I";
+                window.syncCheckUI(inputs[5 + colActiva]);
+            }
+            window.programarAutoguardado();
+        }
+    }
+    window.actualizarSidebarPendientes();
+};
+
+window.actualizarBadgeCampanaVisacion = function () {
+    const usuario = JSON.parse(sessionStorage.getItem("FarmaPerfil_Sesion") || "{}");
+    const badge = document.getElementById("badgeCampanaVisacion");
+    const btnCampana = document.getElementById("btnCampanaVisacion");
+    if (!badge || !btnCampana || !usuario.rol) return;
+
+    const esQF = usuario.rol === "Químico Farmacéutico";
+    const misServiciosQF = (usuario.serviciosAsignados || window.LISTA_SERVICIOS_BASE).map(s => s.toUpperCase());
+
+    let conteo = 0;
+    if (esQF) {
+        // Para el QF: cuenta solicitudes PENDIENTES de sus servicios asignados
+        conteo = window.solicitudesVisacionCache.filter(
+            s => s.estado === "PENDIENTE" && misServiciosQF.includes((s.servicio || "").toUpperCase())
+        ).length;
+    } else {
+        // Para el TENS: cuenta sus solicitudes pendientes o resueltas recientemente
+        conteo = window.solicitudesVisacionCache.filter(
+            s => (s.solicitadoPorRut === usuario.rut || s.solicitadoPorNombre === usuario.nombre) && s.estado === "PENDIENTE"
+        ).length;
+    }
+
+    if (conteo > 0) {
+        badge.style.display = "inline-block";
+        badge.innerText = conteo;
+        btnCampana.classList.add("campana-activa");
+    } else {
+        badge.style.display = "none";
+        btnCampana.classList.remove("campana-activa");
+    }
+};
+
+window.abrirModalBandejaVisacion = function () {
+    const modal = document.getElementById("modal-visacion-qf");
+    if (!modal) return;
+    window.renderizarBandejaVisacion();
+    modal.style.display = "flex";
+    setTimeout(() => modal.classList.add("show"), 15);
+};
+
+window.cerrarModalBandejaVisacion = function () {
+    const modal = document.getElementById("modal-visacion-qf");
+    if (!modal) return;
+    modal.classList.remove("show");
+    setTimeout(() => modal.style.display = "none", 250);
+};
+
+window.renderizarBandejaVisacion = function () {
+    const contenedor = document.getElementById("contenedor-items-visacion");
+    const subtitulo = document.getElementById("subtitulo-modal-visacion");
+    if (!contenedor) return;
+
+    const usuario = JSON.parse(sessionStorage.getItem("FarmaPerfil_Sesion") || "{}");
+    const esQF = usuario.rol === "Químico Farmacéutico";
+    const misServiciosQF = (usuario.serviciosAsignados || window.LISTA_SERVICIOS_BASE).map(s => s.toUpperCase());
+
+    if (subtitulo) {
+        subtitulo.innerHTML = esQF
+            ? `Modo <b>Químico Farmacéutico</b> · Servicios activos hoy: <span style="color:var(--accent-blue); font-weight:800;">${misServiciosQF.join(", ")}</span>`
+            : `Modo <b>${usuario.rol || "Clínico"}</b> · Estado en tiempo real de medicamentos enviados a visación por QF.`;
+    }
+
+    let listaFiltrada = [];
+    if (esQF) {
+        listaFiltrada = window.solicitudesVisacionCache.filter(s => misServiciosQF.includes((s.servicio || "").toUpperCase()));
+    } else {
+        const srvActual = (document.getElementById("servicio")?.value || "").toUpperCase();
+        listaFiltrada = window.solicitudesVisacionCache.filter(
+            s => s.solicitadoPorRut === usuario.rut || s.solicitadoPorNombre === usuario.nombre || (s.servicio || "").toUpperCase() === srvActual
+        );
+    }
+
+    if (listaFiltrada.length === 0) {
+        contenedor.innerHTML = `
+            <div style="text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 13px;">
+                <span class="material-icons-round" style="font-size: 44px; display: block; margin-bottom: 10px; opacity: 0.4;">mark_email_read</span>
+                No hay solicitudes de visación pendientes en este momento.
+            </div>`;
+        return;
+    }
+
+    contenedor.innerHTML = listaFiltrada.map(sol => {
+        const esPendiente = sol.estado === "PENDIENTE";
+        const esAprobado = sol.estado === "ACEPTADO";
+        const claseEstado = esAprobado ? "visacion-aprobada" : (sol.estado === "RECHAZADO" ? "visacion-rechazada" : "");
+        const colorBadge = esAprobado ? "var(--accent-green)" : (sol.estado === "RECHAZADO" ? "var(--accent-red)" : "#ff9800");
+
+        const haceMin = Math.max(1, Math.floor((Date.now() - (sol.timestamp || Date.now())) / 60000));
+        const tiempoTexto = haceMin < 60 ? `Hace ${haceMin} min` : `Hace ${Math.floor(haceMin / 60)} hrs`;
+
+        let controlesQF = "";
+        if (esQF && esPendiente) {
+            const esOC = sol.tipoRestriccion === "ORDEN_COMPRA";
+            const opcionesMedicos = (sol.medicosSugeridos && sol.medicosSugeridos.length > 0)
+                ? sol.medicosSugeridos
+                : (window.medicosData || []).map(m => m.nombre);
+            const datalistId = `dl_qf_${sol.idSolicitud}`;
+
+            controlesQF = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; padding-top: 10px; border-top: 1px dashed var(--glass-border);">
+                    ${esOC ? `
+                        <input type="number" id="inp_oc_${sol.idSolicitud}" class="input-nuevo-concil" placeholder="Días autorizados OC (Ej: 15)" min="1">
+                    ` : `
+                        <input type="text" id="inp_med_${sol.idSolicitud}" list="${datalistId}" class="input-nuevo-concil" placeholder="🔍 Seleccione o escriba médico que autoriza..." autocomplete="off">
+                        <datalist id="${datalistId}">
+                            ${opcionesMedicos.map(m => `<option value="${m}">`).join("")}
+                        </datalist>
+                    `}
+                    <input type="text" id="inp_obs_${sol.idSolicitud}" class="input-nuevo-concil" placeholder="Observación o motivo (opcional)...">
+                </div>
+                <div style="display: flex; gap: 8px; margin-top: 6px;">
+                    <button type="button" onclick="window.resolverSolicitudQF('${sol.idSolicitud}', 'ACEPTADO')" style="flex: 1.2; background: var(--accent-green); color: #000; border: none; padding: 8px 12px; border-radius: 8px; font-weight: 900; font-size: 11.5px; cursor: pointer;">
+                        ✅ AUTORIZAR TRATAMIENTO
+                    </button>
+                    <button type="button" onclick="window.resolverSolicitudQF('${sol.idSolicitud}', 'RECHAZADO')" style="flex: 1; background: rgba(255,82,82,0.2); color: #ff5252; border: 1px solid #ff5252; padding: 8px 12px; border-radius: 8px; font-weight: 900; font-size: 11.5px; cursor: pointer;">
+                        ❌ RECHAZAR
+                    </button>
+                    <button type="button" onclick="window.irAPacienteDesdeVisacion('${sol.servicio}', '${sol.cama}')" style="background: rgba(64,196,255,0.15); color: var(--accent-blue); border: 1px solid var(--accent-blue); padding: 8px 12px; border-radius: 8px; font-weight: 800; font-size: 11px; cursor: pointer;">
+                        VER PERFIL
+                    </button>
+                </div>
+            `;
+        } else {
+            controlesQF = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px; font-size: 11.5px; color: var(--text-muted);">
+                    <span>
+                        ${esPendiente
+                            ? `⏳ Esperando revisión del Químico Farmacéutico...`
+                            : `Resuelto por QF <b>${sol.resueltoPorQF}</b>${sol.medicoAutorizador ? `· Autoriza: <b>${sol.medicoAutorizador}</b>` : ""} ${sol.observacionQF ? `· Nota: <b>${sol.observacionQF}</b>` : ""}`
+                        }
+                    </span>
+                    <div style="display: flex; gap: 6px;">
+                        <button type="button" onclick="window.irAPacienteDesdeVisacion('${sol.servicio}', '${sol.cama}')" style="background: rgba(64,196,255,0.15); color: var(--accent-blue); border: 1px solid var(--accent-blue); padding: 5px 10px; border-radius: 6px; font-weight: 800; font-size: 10.5px; cursor: pointer;">
+                            IR A CAMA
+                        </button>
+                        ${!esPendiente ? `
+                            <button type="button" onclick="window.archivarSolicitudVisacion('${sol.idSolicitud}')" style="background: rgba(255,255,255,0.08); color: var(--text-muted); border: 1px solid var(--glass-border); padding: 5px 8px; border-radius: 6px; font-size: 10px; cursor: pointer;" title="Limpiar de la bandeja">
+                                Archivar
+                            </button>
+                        ` : ""}
+                    </div>
+                </div>
+            `;
+        }
+
+        return `
+            <div class="tarjeta-visacion ${claseEstado}">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div>
+                        <span style="font-size: 15px; font-weight: 900; color: var(--text-main); text-transform: uppercase;">${sol.medicamento}</span>
+                        <span style="font-size: 12px; color: var(--accent-blue); font-weight: 800; margin-left: 8px;">${[sol.via, sol.dosis, sol.posologia].filter(Boolean).join(" · ")}</span>
+                        <div style="font-size: 12px; color: var(--text-main); margin-top: 4px;">
+                            <b>${sol.servicio} - ${sol.cama}</b> · Paciente: <b>${sol.paciente}</b> (${sol.rutPaciente || "Sin RUT"})
+                        </div>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+                            Diagnóstico: ${sol.diagnostico} · Protocolo: <b style="color:#ff9800;">${sol.especialidadRequerida}</b>
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <span class="badge" style="background: ${colorBadge}; color: #000; font-weight: 900; font-size: 10px;">${sol.estado}</span>
+                        <div style="font-size: 10px; color: var(--text-muted); margin-top: 5px;">${tiempoTexto} · Por: ${sol.solicitadoPorNombre}</div>
+                    </div>
+                </div>
+                ${controlesQF}
+            </div>
+        `;
+    }).join("");
+};
+
+window.resolverSolicitudQF = async function (idSolicitud, nuevoEstado) {
+    const sol = window.solicitudesVisacionCache.find(s => s.idSolicitud === idSolicitud);
+    if (!sol) return;
+
+    const usuarioQF = JSON.parse(sessionStorage.getItem("FarmaPerfil_Sesion") || "{}");
+    const inpMed = document.getElementById(`inp_med_${idSolicitud}`);
+    const inpOC = document.getElementById(`inp_oc_${idSolicitud}`);
+    const inpObs = document.getElementById(`inp_obs_${idSolicitud}`);
+
+    const medicoAutorizador = inpMed ? inpMed.value.trim().toUpperCase() : "";
+    const diasOC = inpOC ? parseInt(inpOC.value) || 0 : 0;
+    const observacionQF = inpObs ? inpObs.value.trim() : "";
+
+    if (nuevoEstado === "ACEPTADO") {
+        if (sol.tipoRestriccion === "ORDEN_COMPRA" && diasOC <= 0) {
+            alert("⚠️ Ingrese la cantidad de días autorizados para la Orden de Compra.");
+            return;
+        }
+        if (sol.tipoRestriccion !== "ORDEN_COMPRA" && !medicoAutorizador) {
+            alert("⚠️ Indique el médico o equipo especialista que respalda la autorización.");
+            return;
+        }
+    } else if (nuevoEstado === "RECHAZADO" && !observacionQF) {
+        alert("⚠️ Escriba un breve motivo de rechazo en el campo de observación para informar al TENS.");
+        if (inpObs) inpObs.focus();
+        return;
+    }
+
+    try {
+        // 1. Actualizar el documento de la solicitud para disparar la notificación al TENS
+        await updateDoc(doc(window.db, "solicitudes_qf", idSolicitud), {
+            estado: nuevoEstado,
+            resueltoPorQF: usuarioQF.nombre || "Químico Farmacéutico",
+            medicoAutorizador,
+            diasOC,
+            observacionQF,
+            notificadoAlTens: false,
+            timestampResolucion: Date.now()
+        });
+
+        // 2. Actualizar directamente el perfil del paciente en Firebase ("camas_activas") por si el TENS ya cambió de cama
+        const refCama = doc(window.db, "camas_activas", sol.idCamaDoc);
+        const snapCama = await getDoc(refCama);
+        if (snapCama.exists()) {
+            const datosCama = snapCama.data();
+            const medsPend = datosCama.medicamentosPendientes || {};
+            const firma = sol.firmaOriginal || `${sol.rowId}|${sol.medicamento.toLowerCase()}`;
+
+            medsPend[firma] = {
+                estado: nuevoEstado,
+                rowId: sol.rowId,
+                medicamento: sol.medicamento.toLowerCase(),
+                especialidad: sol.especialidadRequerida,
+                medicos: sol.medicosSugeridos || [],
+                tipo: sol.tipoRestriccion || "ESTANDAR",
+                diasOC: diasOC,
+                medicoAutorizador: medicoAutorizador,
+                observacionQF: observacionQF
+            };
+            datosCama.medicamentosPendientes = medsPend;
+
+            // Si fue aprobado, calcular y rellenar las unidades del día activo en el documento de la cama
+            if ( datosCama.medicamentos && datosCama.medicamentos[sol.rowId]) {
+                let colActiva = 0;
+                if (datosCama.fechasCabecera) {
+                    datosCama.fechasCabecera.forEach((f, idx) => { if (f && f.trim() !== "") colActiva = idx; });
+                }
+                if (nuevoEstado === "ACEPTADO") {
+                    const m = datosCama.medicamentos[sol.rowId];
+                    if (sol.tipoRestriccion === "ORDEN_COMPRA" && diasOC > 0) {
+                        m.posologia = m.posologia.replace(/\s*\[OC:\s*\d+\]/ig, "") + ` [OC:${diasOC}]`;
+                    }
+                    const unid = window.calcularDosisFila(m.farmaco, m.via, m.dosis, m.posologia, 1, null);
+                    if (m.dias && unid !== "") m.dias[colActiva] = String(unid);
+                } else if (nuevoEstado === "RECHAZADO") {
+                    const m = datosCama.medicamentos[sol.rowId];
+                    if (m.dias) m.dias[colActiva] = "S/I";
+                }
+            }
+            await setDoc(refCama, datosCama);
+        }
+
+        window.mostrarToastFarmacia(
+            `Has marcado <b>${sol.medicamento.toUpperCase()}</b> como <b>${nuevoEstado}</b>. El TENS recibirá el aviso en su pantalla.`,
+            "Visación Registrada"
+        );
+    } catch (err) {
+        alert("❌ Error al resolver solicitud: " + err.message);
+    }
+};
+
+window.archivarSolicitudVisacion = async function (idSolicitud) {
+    try {
+        await deleteDoc(doc(window.db, "solicitudes_qf", idSolicitud));
+    } catch (err) {
+        console.error("Error archivando solicitud:", err);
+    }
+};
+
+window.irAPacienteDesdeVisacion = function (servicio, cama) {
+    window.cerrarModalBandejaVisacion();
+    window.irAPacienteCenso(servicio, cama);
 };
