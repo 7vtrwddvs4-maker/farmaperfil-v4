@@ -860,7 +860,8 @@ window.ejecutarGuardadoSilencioso = async function (servicio, cama) {
 
         const idCama = `${servicio.toLowerCase()}_${cama.toLowerCase()}`.replace(/\s+/g, '_');
         const docRef = doc(window.db, "camas_activas", idCama);
-        await setDoc(docRef, paciente);
+        const pacienteLimpio = JSON.parse(JSON.stringify(paciente));
+        await setDoc(docRef, pacienteLimpio);
 
         window.datosSincronizados = true;
         window.hayCambiosSinGuardar = false;
@@ -2363,8 +2364,8 @@ window.escanearRestringidos = function () {
                 if (keyPrevia) registroExistente = window.medicamentosPendientes[keyPrevia];
             }
 
-            let estadoActual = registroExistente?.estado;
-            let memoriaOC = registroExistente?.diasOC;
+            let estadoActual = registroExistente?.estado || "";
+            let memoriaOC = registroExistente?.diasOC || 0;
             let medicoAutorizador = registroExistente?.medicoAutorizador || "";
 
             // 2. BLINDAJE VISUAL: Si la celda de la grilla ya dice AUTORIZADO, forzar estado ACEPTADO
