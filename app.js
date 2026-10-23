@@ -132,6 +132,66 @@ window.quitarTildes = function (texto) {
     return (texto || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 };
 
+// ============================================================================
+// 🔒 MOTOR DE PRIVACIDAD CLÍNICA Y SEUDONIMIZACIÓN (LEY 21.719 / LEY 20.584)
+// ============================================================================
+const SEMILLA_CLINICA_HEP = "HEP_FarmaPerfil_v4_2026_ BioSec";
+
+window.cifrarDatoSensible = function (textoPlano) {
+    if (!textoPlano) return "";
+    const limpio = String(textoPlano).trim().toUpperCase();
+    let xored = "";
+    for (let i = 0; i < limpio.length; i++) {
+        const charCode = limpio.charCodeAt(i) ^ SEMILLA_CLINICA_HEP.charCodeAt(i % SEMILLA_CLINICA_HEP.length);
+        xored += String.fromCharCode(charCode);
+    }
+    return "ENCv4_" + btoa(encodeURIComponent(xored)).split("").reverse().join("");
+};
+
+window.descifrarDatoSensible = function (textoCifrado) {
+    if (!textoCifrado) return "";
+    const str = String(textoCifrado).trim();
+    // Compatibilidad retroactiva: si viene en texto plano de versiones anteriores, devolverlo directo
+    if (!str.startsWith("ENCv4_")) return str;
+    try {
+        const base64Normal = str.replace("ENCv4_", "").split("").reverse().join("");
+        const xored = decodeURIComponent(atob(base64Normal));
+        let original = "";
+        for (let i = 0; i < xored.length; i++) {
+            const charCode = xored.charCodeAt(i) ^ SEMILLA_CLINICA_HEP.charCodeAt(i % SEMILLA_CLINICA_HEP.length);
+            original += String.fromCharCode(charCode);
+        }
+        return original;
+    } catch (e) {
+        return "";
+    }
+};
+
+window.generarHashClinico = function (rutTexto) {
+    if (!rutTexto) return "";
+    const limpio = String(rutTexto).replace(/[^0-9kK]/g, "").toUpperCase();
+    if (!limpio) return "";
+    let hash1 = 5381;
+    let hash2 = 52711;
+    for (let i = 0; i < limpio.length; i++) {
+        const char = limpio.charCodeAt(i);
+        hash1 = (hash1 * 33) ^ char;
+        hash2 = (hash2 * 33) ^ (char + i);
+    }
+    return "HSH_" + (hash1 >>> 0).toString(16).toUpperCase() + (hash2 >>> 0).toString(16).toUpperCase();
+};
+
+// Llave Maestra del Paciente: Prioriza N° de Ficha Clínica; si no existe, usa Hash del RUT o ID de cama
+window.obtenerLlaveMaestraPaciente = function () {
+    const ficha = document.getElementById("ficha")?.value.trim().replace(/[^a-zA-Z0-9]/g, "");
+    if (ficha) return `FICHA_${ficha}`;
+    const rut = document.getElementById("rut")?.value.trim();
+    if (rut) return window.generarHashClinico(rut);
+    const serv = (document.getElementById("servicio")?.value || "sin").toLowerCase().replace(/\s+/g, "_");
+    const cam = (document.getElementById("cama")?.value || "sincama").toLowerCase().replace(/\s+/g, "_");
+    return `${serv}_${cam}`;
+};
+
 window.toggleTheme = function () {
     const isLight = document.body.classList.toggle("light-theme");
     const icon = document.getElementById("theme-icon");
@@ -744,9 +804,10 @@ window.cargarTratamientoPacienteCama = async function () {
 
         if (docSnap.exists()) {
             const res = docSnap.data();
+            const rutRecuperado = res.rut_Vault ? window.descifrarDatoSensible(res.rut_Vault) : (res.rut || "");
 
-            document.getElementById("rut").value = res.rut || "";
-            if (res.rut) window.validarRut(document.getElementById("rut"));
+            document.getElementById("rut").value = rutRecuperado;
+            if (rutRecuperado) window.validarRut(document.getElementById("rut"));
             document.getElementById("paciente").value = res.nombre || "";
             document.getElementById("peso").value = res.peso || "";
             document.getElementById("ficha").value = res.ficha || "";
@@ -790,9 +851,11 @@ window.cargarTratamientoPacienteCama = async function () {
         if (status) status.innerHTML = `<span class="material-icons-round" style="font-size: 18px; color: var(--accent-green);">cloud_done</span> <span style="color: var(--text-muted);">Nube actualizada</span>`;
 
         setTimeout(() => {
-            let rutActual = document.getElementById("rut").value.trim() || idCama;
+            let llaveMaestra = window.obtenerLlaveMaestraPaciente();
+            let rutLegacy = document.getElementById("rut").value.trim() || idCama;
             const pendientesNube = (docSnap && docSnap.exists() && docSnap.data().medicamentosPendientes) ? docSnap.data().medicamentosPendientes : {};
-            const pendientesLocal = JSON.parse(localStorage.getItem("pendientes_" + rutActual)) || {};
+            const pendientesLocal = JSON.parse(localStorage.getItem("pendientes_" + llaveMaestra)) ||
+                                    JSON.parse(localStorage.getItem("pendientes_" + rutLegacy)) || {};
             window.medicamentosPendientes = { ...pendientesLocal, ...pendientesNube };
 
             window.actualizarSaldosYSidebar();
@@ -813,13 +876,18 @@ window.cargarTratamientoPacienteCama = async function () {
 window.ejecutarGuardadoSilencioso = async function (servicio, cama) {
     if (window.isCargandoPerfil || window.isModoHistorico) return;
     try {
+        const rutPlano = document.getElementById("rut").value.trim();
+        const fichaClinica = document.getElementById("ficha").value.trim();
+
         const paciente = {
             cama: cama,
-            rut: document.getElementById("rut").value.trim(),
+            ficha: fichaClinica,
+            idFichaMaestra: window.obtenerLlaveMaestraPaciente(),
+            rut_Vault: window.cifrarDatoSensible(rutPlano),
+            rut_Hash: window.generarHashClinico(rutPlano),
             nombre: document.getElementById("paciente").value.trim(),
             peso: document.getElementById("peso").value.trim(),
             servicio: servicio,
-            ficha: document.getElementById("ficha").value.trim(),
             genero: document.getElementById("genero") ? document.getElementById("genero").value : "",
             fechaIngreso: document.getElementById("fechaIngreso").value,
             diagnostico: document.getElementById("diagnostico").value.trim(),
@@ -3211,12 +3279,16 @@ document.getElementById("btn-ejecutar-gestion")?.addEventListener("click", async
     const servicioOrigen = document.getElementById("servicio").value;
     const idOrigen = `${servicioOrigen.toLowerCase()}_${camaOrigen.toLowerCase()}`.replace(/\s+/g, '_');
     const paciente = document.getElementById("paciente").value.trim();
+    const ficha = document.getElementById("ficha").value.trim();
     const rut = document.getElementById("rut").value.trim();
 
-    if (window.accionGestionSeleccionada !== 'limpiar' && (!paciente || !rut)) {
-        alert("⚠️ Faltan datos críticos del paciente (Nombre/RUT) para realizar esta acción.");
+    if (window.accionGestionSeleccionada !== 'limpiar' && (!paciente || (!ficha && !rut))) {
+        alert("⚠️ Ingrese al menos el Nombre y el N° de Ficha (o RUT) del paciente para realizar esta acción.");
         return;
     }
+
+    // Llave maestra del documento en Tránsito y Archivo Histórico (Prioriza N° de Ficha)
+    const idDocClinico = ficha ? `FICHA_${ficha.replace(/[^a-zA-Z0-9]/g, "")}` : window.generarHashClinico(rut);
 
     const btn = this;
     const textoOriginal = btn.innerText;
@@ -3270,7 +3342,7 @@ document.getElementById("btn-ejecutar-gestion")?.addEventListener("click", async
             datosOrigen.servicio = servicioDestino;
             datosOrigen.cama = camaDestino;
 
-            if (snapDestino.exists() && snapDestino.data().rut) {
+            if (snapDestino.exists() && (snapDestino.data().nombre || snapDestino.data().ficha || snapDestino.data().rut_Vault || snapDestino.data().rut)) {
                 // Hay paciente en la cama destino -> Colisión / Intercambio
                 const datosOcupante = snapDestino.data();
                 const confirmarCruce = confirm(`🚨 COLISIÓN DETECTADA:\nLa ${camaDestino} está ocupada por ${datosOcupante.nombre}.\n\n¿Deseas INTERCAMBIAR las camas de ambos pacientes?`);
@@ -3300,7 +3372,7 @@ document.getElementById("btn-ejecutar-gestion")?.addEventListener("click", async
         }
 
         // ---------------------------------------------------------
-        // 🚶 ACCIÓN: ENVIAR A TRÁNSITO
+        // 🚶 ACCIÓN: ENVIAR A TRÁNSITO (LLAVE MAESTRA: N° FICHA)
         // ---------------------------------------------------------
         else if (window.accionGestionSeleccionada === 'transito') {
             btn.innerText = "ENVIANDO A TRÁNSITO...";
@@ -3309,10 +3381,12 @@ document.getElementById("btn-ejecutar-gestion")?.addEventListener("click", async
 
             if (snapOrigen.exists()) {
                 let datosTransito = snapOrigen.data();
+                datosTransito.idDocTransito = idDocClinico;
                 datosTransito.origen = `${servicioOrigen} - ${camaOrigen}`;
                 datosTransito.timestamp = new Date().getTime();
+                delete datosTransito.rut; // Asegura que no viaje texto plano antiguo
 
-                await setDoc(doc(window.db, "pacientes_transito", rut), datosTransito);
+                await setDoc(doc(window.db, "pacientes_transito", idDocClinico), JSON.parse(JSON.stringify(datosTransito)));
                 await deleteDoc(refOrigen);
 
                 alert("✅ Paciente enviado a Tránsito de forma segura.");
@@ -3323,7 +3397,7 @@ document.getElementById("btn-ejecutar-gestion")?.addEventListener("click", async
         }
 
         // ---------------------------------------------------------
-        // 🚪 ACCIÓN: EGRESO CLÍNICO (ARCHIVO)
+        // 🚪 ACCIÓN: EGRESO CLÍNICO (ARCHIVO CON LLAVE N° FICHA)
         // ---------------------------------------------------------
         else if (window.accionGestionSeleccionada === 'egreso') {
             btn.innerText = "ARCHIVANDO EGRESO...";
@@ -3333,11 +3407,13 @@ document.getElementById("btn-ejecutar-gestion")?.addEventListener("click", async
 
             if (snapOrigen.exists()) {
                 let datosEgreso = snapOrigen.data();
+                datosEgreso.idDocHistorico = idDocClinico;
                 datosEgreso.motivoEgreso = motivo;
+                delete datosEgreso.rut; // Asegura que no viaje texto plano antiguo
                 const hoy = new Date();
                 datosEgreso.fechaEgreso = `${hoy.getDate().toString().padStart(2, '0')}/${(hoy.getMonth() + 1).toString().padStart(2, '0')}/${hoy.getFullYear()}`;
 
-                await setDoc(doc(window.db, "archivo_historico", rut), datosEgreso);
+                await setDoc(doc(window.db, "archivo_historico", idDocClinico), JSON.parse(JSON.stringify(datosEgreso)));
                 await deleteDoc(refOrigen);
 
                 window.cerrarModalGestion();
@@ -3378,7 +3454,11 @@ window.cargarSidebarTransito = async function () {
     try {
         const querySnapshot = await getDocs(collection(window.db, "pacientes_transito"));
         let pacientes = [];
-        querySnapshot.forEach((doc) => pacientes.push(doc.data()));
+        querySnapshot.forEach((docSnap) => {
+            const d = docSnap.data();
+            d.idDocTransito = docSnap.id;
+            pacientes.push(d);
+        });
 
         if (pacientes.length === 0) {
             if (badge) badge.style.display = "none";
@@ -3419,8 +3499,8 @@ window.cargarSidebarTransito = async function () {
                         </span>
                     </div>
                     <div style="display: flex; gap: 5px;">
-                        <button onclick="window.ejecutarAltaTransito('${p.rut}', '${p.nombre}')" style="background: var(--accent-red); color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 10px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2);" title="Dar de Alta Definitiva">ALTA</button>
-                        <button onclick="window.ejecutarRescate('${p.rut}', '${p.nombre}')" style="background: var(--accent-blue); color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 10px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">RESCATAR</button>
+                        <button onclick="window.ejecutarAltaTransito('${p.idDocTransito}', '${p.nombre}')" style="background: var(--accent-red); color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 10px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2);" title="Dar de Alta Definitiva">ALTA</button>
+                        <button onclick="window.ejecutarRescate('${p.idDocTransito}', '${p.nombre}')" style="background: var(--accent-blue); color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 10px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">RESCATAR</button>
                     </div>
                 </div>
             </div>`;
@@ -3449,7 +3529,7 @@ window.ejecutarRescate = async function (rutPaciente, nombrePaciente) {
         const refDestino = doc(window.db, "camas_activas", idDestino);
         const snapDestino = await getDoc(refDestino);
 
-        if (snapDestino.exists() && snapDestino.data().rut) {
+        if (snapDestino.exists() && (snapDestino.data().nombre || snapDestino.data().ficha || snapDestino.data().rut_Vault || snapDestino.data().rut)) {
             alert(`🚨 La ${camaDestino} está ocupada por ${snapDestino.data().nombre}. Mueva el selector a una cama vacía primero.`);
             return;
         }
@@ -5058,7 +5138,7 @@ window.calcCalcularEsquema = function (hacerScroll = true) {
 };
 
 // ============================================================================
-// 16. MODAL HISTÓRICO Y CÁPSULA DEL TIEMPO (FIRESTORE)
+// 16. MODAL HISTÓRICO Y CÁPSULA DEL TIEMPO (LLAVE MAESTRA: N° FICHA + RUT CIFRADO)
 // ============================================================================
 window.abrirModalHistorico = async function () {
     const modal = document.getElementById("modal-historico");
@@ -5068,21 +5148,29 @@ window.abrirModalHistorico = async function () {
 
         document.getElementById("lista-egresos-recientes").innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 12px; margin-top: 10px;"><span class="material-icons-round" style="font-size: 24px; display: block; margin-bottom: 5px;">cloud_download</span>Conectando con el Archivo Histórico...</div>`;
 
-        const inputRutHist = document.getElementById("input-buscar-rut-historico");
-        if (inputRutHist) {
-            inputRutHist.value = "";
-            inputRutHist.oninput = function () {
-                let valor = this.value.replace(/[^0-9kK]/g, '').toUpperCase();
-                if (valor.length > 1) { this.value = valor.slice(0, -1) + '-' + valor.slice(-1); }
-                else { this.value = valor; }
+        const inputBusqHist = document.getElementById("input-buscar-rut-historico");
+        if (inputBusqHist) {
+            inputBusqHist.value = "";
+            inputBusqHist.placeholder = "Ingrese N° de Ficha Clínica o RUT...";
+            inputBusqHist.oninput = function () {
+                let raw = this.value.trim();
+                // Si tiene más de 6 caracteres o incluye K/guion, formatear como RUT; si es corto, dejar como N° Ficha
+                let limpio = raw.replace(/[^0-9kK]/g, '').toUpperCase();
+                if (limpio.length >= 7 || raw.includes("-") || /K/i.test(raw)) {
+                    this.value = limpio.length > 1 ? limpio.slice(0, -1) + '-' + limpio.slice(-1) : limpio;
+                }
             };
         }
 
         try {
-            // Descarga todos los egresos y los ordena del más reciente al más antiguo
             const snap = await getDocs(collection(window.db, "archivo_historico"));
             let egresos = [];
-            snap.forEach(documento => egresos.push(documento.data()));
+            snap.forEach(documento => {
+                const d = documento.data();
+                d.idDocHistorico = documento.id;
+                d.rutVisible = d.rut_Vault ? window.descifrarDatoSensible(d.rut_Vault) : (d.rut || "S/R");
+                egresos.push(d);
+            });
 
             egresos.sort((a, b) => {
                 let dateA = new Date(a.ultimaModificacion || 0).getTime();
@@ -5090,17 +5178,18 @@ window.abrirModalHistorico = async function () {
                 return dateB - dateA;
             });
 
-            egresos = egresos.slice(0, 15); // Muestra solo los 15 más recientes para agilidad
+            window.cacheEgresosHistoricos = egresos;
+            const recientes = egresos.slice(0, 15);
 
             let html = "";
-            if (egresos.length === 0) {
+            if (recientes.length === 0) {
                 html = `<div style="text-align:center; padding:10px; color:var(--text-muted); font-size:12px;">No hay egresos registrados en la base de datos.</div>`;
             } else {
-                egresos.forEach(e => {
-                    html += `<div class="lista-historica-item" onclick="window.cargarPerfilHistorico('${e.rut}')">
+                recientes.forEach(e => {
+                    html += `<div class="lista-historica-item" onclick="window.cargarPerfilHistorico('${e.idDocHistorico}')">
                                 <div>
                                     <strong style="display:block; color:var(--accent-blue); font-size:13px; text-transform:uppercase;">${e.nombre || 'PACIENTE SIN NOMBRE'}</strong>
-                                    <span style="font-size:11px; color:var(--text-muted);">RUT: ${e.rut} | Fecha Egreso: ${e.fechaEgreso || (e.ultimaModificacion ? e.ultimaModificacion.split('T')[0] : 'N/A')}</span>
+                                    <span style="font-size:11px; color:var(--text-muted);">Ficha: <b>${e.ficha || 'S/F'}</b> | RUT: ${e.rutVisible} | Egreso: ${e.fechaEgreso || 'N/A'}</span>
                                 </div>
                                 <span class="material-icons-round" style="color:var(--text-muted); font-size:18px;">history</span>
                              </div>`;
@@ -5109,7 +5198,7 @@ window.abrirModalHistorico = async function () {
             document.getElementById("lista-egresos-recientes").innerHTML = html;
         } catch (err) {
             console.error("Error al cargar historial:", err);
-            document.getElementById("lista-egresos-recientes").innerHTML = `<div style="text-align:center; padding:10px; color:var(--accent-red); font-size:12px;">Error al cargar historial de Firestore. Verifique su conexión.</div>`;
+            document.getElementById("lista-egresos-recientes").innerHTML = `<div style="text-align:center; padding:10px; color:var(--accent-red); font-size:12px;">Error al cargar historial de Firestore.</div>`;
         }
     }
 };
@@ -5123,28 +5212,44 @@ window.cerrarModalHistorico = function () {
 };
 
 window.ejecutarBusquedaHistorica = function () {
-    const rut = document.getElementById("input-buscar-rut-historico").value.trim();
-    if (!rut || rut.length < 8) { alert("⚠️ Ingrese un RUT válido para buscar."); return; }
-    window.cargarPerfilHistorico(rut);
+    const termino = document.getElementById("input-buscar-rut-historico").value.trim().toUpperCase();
+    if (!termino) { alert("⚠️ Ingrese un N° de Ficha o un RUT para buscar."); return; }
+
+    // Buscar en el caché descargado por Ficha exacta, ID de documento o RUT desencriptado
+    const lista = window.cacheEgresosHistoricos || [];
+    const hashBuscado = window.generarHashClinico(termino);
+    const encontrado = lista.find(e =>
+        (e.ficha && String(e.ficha).trim().toUpperCase() === termino) ||
+        (e.idDocHistorico && e.idDocHistorico.toUpperCase() === `FICHA_${termino}`) ||
+        (e.rutVisible && e.rutVisible.toUpperCase() === termino) ||
+        (e.rut_Hash && e.rut_Hash === hashBuscado)
+    );
+
+    if (encontrado) {
+        window.cargarPerfilHistorico(encontrado.idDocHistorico);
+    } else {
+        // Intento directo por ID en caso de que no estuviera en caché
+        window.cargarPerfilHistorico(`FICHA_${termino}`);
+    }
 };
 
-window.cargarPerfilHistorico = async function (rutBuscado) {
+window.cargarPerfilHistorico = async function (idDocBuscado) {
     const modal = document.getElementById("modal-historico");
     const btn = modal.querySelector(".modal-actions .btn-validar");
     const textoOriginal = btn ? btn.innerText : "BUSCAR PACIENTE";
     if (btn) { btn.innerText = "BUSCANDO..."; btn.disabled = true; }
 
     try {
-        const docRef = doc(window.db, "archivo_historico", rutBuscado);
+        const docRef = doc(window.db, "archivo_historico", idDocBuscado);
         const docSnap = await getDoc(docRef);
 
         if (btn) { btn.innerText = textoOriginal; btn.disabled = false; }
 
         if (docSnap.exists()) {
             const res = docSnap.data();
+            const rutRecuperado = res.rut_Vault ? window.descifrarDatoSensible(res.rut_Vault) : (res.rut || "");
             window.cerrarModalHistorico();
 
-            // Bloqueo total de la cápsula del tiempo (Solo Lectura)
             window.isModoHistorico = true;
             document.body.classList.add("modo-historico");
 
@@ -5164,8 +5269,7 @@ window.cargarPerfilHistorico = async function (rutBuscado) {
 
             window.limpiarFormularioPerfil();
 
-            // Inyección de datos
-            document.getElementById("rut").value = res.rut || "";
+            document.getElementById("rut").value = rutRecuperado;
             document.getElementById("paciente").value = res.nombre || "";
             document.getElementById("peso").value = res.peso || "";
             document.getElementById("ficha").value = res.ficha || "";
@@ -5216,7 +5320,7 @@ window.cargarPerfilHistorico = async function (rutBuscado) {
 
             window.mostrarToastFarmacia("Se ha cargado el perfil archivado del paciente.", "Cápsula del Tiempo");
         } else {
-            alert("❌ No se encontró ningún egreso reciente con el RUT: " + rutBuscado);
+            alert("❌ No se encontró ningún egreso registrado con ese N° de Ficha o RUT.");
         }
     } catch (err) {
         if (btn) { btn.innerText = textoOriginal; btn.disabled = false; }
@@ -5248,6 +5352,7 @@ window.abrirModalCenso = async function () {
             snapCamas.forEach(docSnap => {
                 const d = docSnap.data();
                 if (d && d.nombre && d.nombre.trim() !== "" && d.servicio) {
+                    d.rut = d.rut_Vault ? window.descifrarDatoSensible(d.rut_Vault) : (d.rut || "");
                     window.pacientesCensoData.push(d);
                     const srv = d.servicio.toUpperCase();
                     conteoPorServicio[srv] = (conteoPorServicio[srv] || 0) + 1;
@@ -5324,7 +5429,9 @@ window.filtrarListaCenso = function () {
             if (esBusquedaPorServicioExacto) {
                 return servLimpio === terminoUpper;
             } else {
+                const fichaLimpia = window.quitarTildes((p.ficha || "").toLowerCase());
                 return nombreLimpio.includes(terminoLower) ||
+                    fichaLimpia.includes(terminoLower) ||
                     rutLimpio.includes(terminoLower) ||
                     camaLimpia.includes(terminoLower) ||
                     servLower.includes(terminoLower);
@@ -5412,7 +5519,8 @@ window.enviarSolicitudVisacionQF = async function (firma) {
             servicio,
             cama,
             paciente: (document.getElementById("paciente")?.value || "PACIENTE SIN NOMBRE").trim().toUpperCase(),
-            rutPaciente: (document.getElementById("rut")?.value || "").trim(),
+            fichaPaciente: (document.getElementById("ficha")?.value || "").trim(),
+            rutPaciente_Vault: window.cifrarDatoSensible((document.getElementById("rut")?.value || "").trim()),
             diagnostico: (document.getElementById("diagnostico")?.value || "Sin diagnóstico registrado").trim(),
             rowId,
             firmaOriginal: firma,
@@ -5797,7 +5905,7 @@ window.renderizarBandejaVisacion = function () {
                         <span style="font-size: 15px; font-weight: 900; color: var(--text-main); text-transform: uppercase;">${sol.medicamento}</span>
                         <span style="font-size: 12px; color: var(--accent-blue); font-weight: 800; margin-left: 8px;">${[sol.via, sol.dosis, sol.posologia].filter(Boolean).join(" · ")}</span>
                         <div style="font-size: 12px; color: var(--text-main); margin-top: 4px;">
-                            <b>${sol.servicio} - ${sol.cama}</b> · Paciente: <b>${sol.paciente}</b> (${sol.rutPaciente || "Sin RUT"})
+                            <b>${sol.servicio} - ${sol.cama}</b> · Paciente: <b>${sol.paciente}</b> (Ficha: ${sol.fichaPaciente || "S/F"} · RUT: ${sol.rutPaciente_Vault ? window.descifrarDatoSensible(sol.rutPaciente_Vault) : (sol.rutPaciente || "S/R")})
                         </div>
                         <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
                             Diagnóstico: ${sol.diagnostico} · Protocolo: <b style="color:#ff9800;">${sol.especialidadRequerida}</b>
