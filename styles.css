@@ -1095,26 +1095,110 @@ body.light-theme .med-grid thead tr:nth-child(2) th:nth-child(4) {
    ========================================================= */
 @media print {
     .med-grid-scroll-wrapper {
+        width: 100% !important;
+        max-width: 100% !important;
         overflow: visible !important;
         border: none !important;
+        border-radius: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }
+
     .med-grid-scroll-wrapper table.med-grid {
         width: 100% !important;
         min-width: 100% !important;
+        max-width: 100% !important;
+        table-layout: fixed !important;
         border-collapse: collapse !important;
         border: 2px solid #000000 !important;
+        margin-bottom: 6px !important;
     }
-    .med-grid th, .med-grid td {
+
+    /* Resetear absolutamente todos los anchos fijos (px) y colores oscuros del modo sticky */
+    .med-grid col,
+    .med-grid thead tr:nth-child(1) th,
+    .med-grid thead tr:nth-child(2) th,
+    .med-grid tbody td {
         position: static !important;
+        left: auto !important;
         box-shadow: none !important;
-        background: transparent !important;
         min-width: 0 !important;
         max-width: none !important;
+        border: 1px solid #000000 !important;
     }
-    .med-grid col:nth-child(1), .med-grid tbody td:nth-child(1) { width: 28% !important; }
-    .med-grid col:nth-child(2), .med-grid tbody td:nth-child(2) { width: 5% !important; }
-    .med-grid col:nth-child(4), .med-grid tbody td:nth-child(4) { width: 9% !important; }
-    .med-grid col:nth-child(n+6), .med-grid tbody td:nth-child(n+6) { width: 5.8% !important; }
+
+    /* Fondos claros obligatorios en impresión (incluso si la app está en Modo Oscuro) */
+    .med-grid thead tr:nth-child(1) th,
+    .med-grid thead tr:nth-child(2) th {
+        background-color: #f2f2f7 !important;
+        color: #000000 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    .med-grid thead tr:nth-child(1) th:nth-child(1),
+    .med-grid thead tr:nth-child(1) th:nth-child(2) {
+        background-color: transparent !important;
+        border-top: none !important;
+        border-left: none !important;
+        border-right: none !important;
+    }
+
+    .med-grid tbody td,
+    .med-grid tbody td:nth-child(1),
+    .med-grid tbody td:nth-child(2),
+    .med-grid tbody td:nth-child(3),
+    .med-grid tbody td:nth-child(4),
+    body.light-theme .med-grid tbody td:nth-child(1),
+    body.light-theme .med-grid tbody td:nth-child(2),
+    body.light-theme .med-grid tbody td:nth-child(3),
+    body.light-theme .med-grid tbody td:nth-child(4) {
+        background-color: transparent !important;
+        color: #000000 !important;
+    }
+
+    /* Ocultar columna Dosis (3) y CDSS (5) en papel tal como en el diseño original */
+    .med-grid col:nth-child(3),
+    .med-grid thead tr:nth-child(2) th:nth-child(3),
+    .med-grid tbody tr td:nth-child(3),
+    .med-grid col:nth-child(5),
+    .med-grid thead tr:nth-child(1) th:nth-child(3),
+    .med-grid thead tr:nth-child(2) th:nth-child(5),
+    .med-grid tbody tr td:nth-child(5) {
+        display: none !important;
+    }
+
+    /* Proporciones exactas de hoja Carta para Fármacos (28%), Vía (5%), Posología (9%) y 10 Fechas (5.8% c/u) */
+    .med-grid col:nth-child(1),
+    .med-grid thead tr:nth-child(1) th:nth-child(1),
+    .med-grid thead tr:nth-child(2) th:nth-child(1),
+    .med-grid tbody td:nth-child(1) {
+        width: 28% !important;
+    }
+
+    .med-grid col:nth-child(2),
+    .med-grid thead tr:nth-child(2) th:nth-child(2),
+    .med-grid tbody td:nth-child(2) {
+        width: 5% !important;
+    }
+
+    .med-grid col:nth-child(4),
+    .med-grid thead tr:nth-child(2) th:nth-child(4),
+    .med-grid tbody td:nth-child(4) {
+        width: 9% !important;
+    }
+
+    .med-grid thead tr:nth-child(1) th:nth-child(2) {
+        width: 14% !important;
+    }
+
+    .med-grid col:nth-child(n+6),
+    .med-grid thead tr:nth-child(1) th:nth-child(n+4),
+    .med-grid thead tr:nth-child(2) th:nth-child(n+6),
+    .med-grid tbody td:nth-child(n+6) {
+        width: 5.8% !important;
+    }
+
     .btn-agregar-columna-dia,
     .ocultar-en-impresion-10dias {
         display: none !important;
