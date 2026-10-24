@@ -20,10 +20,10 @@
          ========================================================================== -->
     <!-- Icono estándar para pestañas del navegador -->
     <link rel="icon" type="image/png" href="icono.png">
-    
+
     <!-- Icono de alta resolución para dispositivos Apple (añadir a pantalla de inicio) -->
     <link rel="apple-touch-icon" href="icono.png">
-    
+
     <!-- Meta etiquetas para que se comporte como una App nativa en móviles -->
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -103,9 +103,13 @@
                         <option value="Médico">Médico</option>
                     </select>
 
-                    <div id="contenedorRegServiciosQF" style="display: none; text-align: left; background: rgba(0,0,0,0.25); border: 1px solid var(--glass-border); border-radius: 10px; padding: 10px; margin-bottom: 12px; max-height: 130px; overflow-y: auto;">
-                        <div style="font-size: 10px; font-weight: 800; color: var(--accent-blue); text-transform: uppercase; margin-bottom: 6px;">Servicios habituales a su cargo (QF):</div>
-                        <div id="listaCheckboxesRegQF" style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 11px;"></div>
+                    <div id="contenedorRegServiciosQF"
+                        style="display: none; text-align: left; background: rgba(0,0,0,0.25); border: 1px solid var(--glass-border); border-radius: 10px; padding: 10px; margin-bottom: 12px; max-height: 130px; overflow-y: auto;">
+                        <div
+                            style="font-size: 10px; font-weight: 800; color: var(--accent-blue); text-transform: uppercase; margin-bottom: 6px;">
+                            Servicios habituales a su cargo (QF):</div>
+                        <div id="listaCheckboxesRegQF"
+                            style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 11px;"></div>
                     </div>
 
                     <input type="password" id="regPin" class="login-input" placeholder="Cree un PIN de 4 números"
@@ -130,12 +134,20 @@
                     <select id="loginServicioSelect" class="login-input"
                         style="text-align-last: center; font-weight: bold; cursor: pointer;"></select>
 
-                    <div id="panelTurnoServiciosQF" style="display: none; text-align: left; background: rgba(0,0,0,0.25); border: 1px solid var(--accent-blue); border-radius: 12px; padding: 10px 12px; margin-bottom: 15px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                            <span style="font-size: 10px; font-weight: 900; color: var(--accent-blue); text-transform: uppercase;">🔔 Servicios a visar hoy (QF):</span>
-                            <button type="button" onclick="window.marcarTodosServiciosQF()" style="background: none; border: none; color: var(--accent-green); font-size: 10px; font-weight: 800; cursor: pointer; padding: 0;">Todos / Ninguno</button>
+                    <div id="panelTurnoServiciosQF"
+                        style="display: none; text-align: left; background: rgba(0,0,0,0.25); border: 1px solid var(--accent-blue); border-radius: 12px; padding: 10px 12px; margin-bottom: 15px;">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <span
+                                style="font-size: 10px; font-weight: 900; color: var(--accent-blue); text-transform: uppercase;">🔔
+                                Servicios a visar hoy (QF):</span>
+                            <button type="button" onclick="window.marcarTodosServiciosQF()"
+                                style="background: none; border: none; color: var(--accent-green); font-size: 10px; font-weight: 800; cursor: pointer; padding: 0;">Todos
+                                / Ninguno</button>
                         </div>
-                        <div id="listaCheckboxesTurnoQF" style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; font-size: 11px; max-height: 110px; overflow-y: auto;"></div>
+                        <div id="listaCheckboxesTurnoQF"
+                            style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; font-size: 11px; max-height: 110px; overflow-y: auto;">
+                        </div>
                     </div>
 
                     <button id="btnComenzarTurno" class="btn-login"
@@ -288,10 +300,11 @@
                     <button class="btn-logout" onclick="cerrarSesion()">Cerrar Sesión (Cambio de Turno)</button>
                 </div>
 
-                <button class="theme-toggle-btn" id="btnCampanaVisacion" style="right: 105px;" onclick="window.abrirModalBandejaVisacion()"
-                    title="Bandeja de Visación y Autorizaciones en Vivo">
+                <button class="theme-toggle-btn" id="btnCampanaVisacion" style="right: 105px;"
+                    onclick="window.abrirModalBandejaVisacion()" title="Bandeja de Visación y Autorizaciones en Vivo">
                     <span class="material-icons-round" id="iconoCampanaVisacion">notifications</span>
-                    <span id="badgeCampanaVisacion" style="display: none; position: absolute; top: -4px; right: -4px; background: var(--accent-red); color: white; font-size: 10px; font-weight: 900; padding: 2px 5px; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.4);">0</span>
+                    <span id="badgeCampanaVisacion"
+                        style="display: none; position: absolute; top: -4px; right: -4px; background: var(--accent-red); color: white; font-size: 10px; font-weight: 900; padding: 2px 5px; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.4);">0</span>
                 </button>
 
                 <button class="theme-toggle-btn" style="right: 60px;" onclick="volverAlMenuPrincipal()"
@@ -379,99 +392,104 @@
             </div>
         </div>
 
-        <table class="med-grid">
-            <colgroup>
-                <col style="width: 22%;">
-                <col style="width: 5%;">
-                <col style="width: 7%;">
-                <col style="width: 9%;">
-                <col style="width: 5%;">
-                <col style="width: 5.2%;">
-                <col style="width: 5.2%;">
-                <col style="width: 5.2%;">
-                <col style="width: 5.2%;">
-                <col style="width: 5.2%;">
-                <col style="width: 5.2%;">
-                <col style="width: 5.2%;">
-                <col style="width: 5.2%;">
-                <col style="width: 5.2%;">
-                <col style="width: 5.2%;">
-            </colgroup>
+        <div id="contenedor-scroll-grilla" class="med-grid-scroll-wrapper">
+            <table class="med-grid">
+                <colgroup>
+                    <col style="width: 22%;">
+                    <col style="width: 5%;">
+                    <col style="width: 7%;">
+                    <col style="width: 9%;">
+                    <col style="width: 5%;">
+                    <col style="width: 5.2%;">
+                    <col style="width: 5.2%;">
+                    <col style="width: 5.2%;">
+                    <col style="width: 5.2%;">
+                    <col style="width: 5.2%;">
+                    <col style="width: 5.2%;">
+                    <col style="width: 5.2%;">
+                    <col style="width: 5.2%;">
+                    <col style="width: 5.2%;">
+                    <col style="width: 5.2%;">
+                </colgroup>
 
-            <thead>
-                <tr>
-                    <th style="border-top: none; border-left: none; background: transparent;"></th>
-                    <th colspan="3" class="dark-th" style="padding: 4px;">
-                        <div style="display: flex; justify-content: center; align-items: center; gap: 6px; color: var(--text-muted); font-size: 10.5px; flex-wrap: nowrap;">
-                            <span>Días:</span>
-                            <input type="number" id="inputDias" tabindex="-1" value="1" min="1" max="10" style="width: 38px;">
-                            <span style="opacity: 0.3;">|</span>
-                            <span title="Cálculo parcial por horas para Farmacia 24h (Turno Noche)">Horas:</span>
-                            <select id="selectHorasDespacho" tabindex="-1" title="Seleccione horas a cubrir hasta apertura de Farmacia Central" style="background: rgba(64, 196, 255, 0.12); color: var(--accent-blue); border: 1px solid var(--accent-blue); border-radius: 6px; padding: 2px 4px; font-size: 11px; font-weight: 900; cursor: pointer; outline: none;">
-                                <option value="24" selected>24h (1 Día)</option>
-                                <option value="12">12 hrs</option>
-                                <option value="8">8 hrs</option>
-                                <option value="6">6 hrs</option>
-                            </select>
-                        </div>
-                    </th>
-                    <th class="dark-th" style="font-size: 10px;">CDSS</th>
-                    <th class="dark-th">Fecha</th>
-                    <th class="dark-th">Fecha</th>
-                    <th class="dark-th">Fecha</th>
-                    <th class="dark-th">Fecha</th>
-                    <th class="dark-th">Fecha</th>
-                    <th class="dark-th">Fecha</th>
-                    <th class="dark-th">Fecha</th>
-                    <th class="dark-th">Fecha</th>
-                    <th class="dark-th">Fecha</th>
-                    <th class="dark-th">Fecha</th>
-                </tr>
-                <tr>
-                    <th style="text-align: left; padding-left: 15px;">
-                        <div class="farmacos-title"><span class="material-icons-round"
-                                style="color: var(--accent-green);">vaccines</span> Fármacos</div>
-                    </th>
-                    <th>Vía</th>
-                    <th>Dosis</th>
-                    <th>Posología</th>
-                    <th style="font-size: 10px; color: var(--text-muted);">Alerta</th>
-                    <th style="padding: 0; position: relative;"><input type="text" class="header-fecha" tabindex="-1"
-                            autocomplete="off"><button class="btn-nuevo-dia" tabindex="-1"
-                            onclick="iniciarNuevoDiaWeb(0)" title="Iniciar Día">▶</button></th>
-                    <th style="padding: 0; position: relative;"><input type="text" class="header-fecha" tabindex="-1"
-                            autocomplete="off"><button class="btn-nuevo-dia" tabindex="-1"
-                            onclick="iniciarNuevoDiaWeb(1)" title="Iniciar Día">▶</button></th>
-                    <th style="padding: 0; position: relative;"><input type="text" class="header-fecha" tabindex="-1"
-                            autocomplete="off"><button class="btn-nuevo-dia" tabindex="-1"
-                            onclick="iniciarNuevoDiaWeb(2)" title="Iniciar Día">▶</button></th>
-                    <th style="padding: 0; position: relative;"><input type="text" class="header-fecha" tabindex="-1"
-                            autocomplete="off"><button class="btn-nuevo-dia" tabindex="-1"
-                            onclick="iniciarNuevoDiaWeb(3)" title="Iniciar Día">▶</button></th>
-                    <th style="padding: 0; position: relative;"><input type="text" class="header-fecha" tabindex="-1"
-                            autocomplete="off"><button class="btn-nuevo-dia" tabindex="-1"
-                            onclick="iniciarNuevoDiaWeb(4)" title="Iniciar Día">▶</button></th>
-                    <th style="padding: 0; position: relative;"><input type="text" class="header-fecha" tabindex="-1"
-                            autocomplete="off"><button class="btn-nuevo-dia" tabindex="-1"
-                            onclick="iniciarNuevoDiaWeb(5)" title="Iniciar Día">▶</button></th>
-                    <th style="padding: 0; position: relative;"><input type="text" class="header-fecha" tabindex="-1"
-                            autocomplete="off"><button class="btn-nuevo-dia" tabindex="-1"
-                            onclick="iniciarNuevoDiaWeb(6)" title="Iniciar Día">▶</button></th>
-                    <th style="padding: 0; position: relative;"><input type="text" class="header-fecha" tabindex="-1"
-                            autocomplete="off"><button class="btn-nuevo-dia" tabindex="-1"
-                            onclick="iniciarNuevoDiaWeb(7)" title="Iniciar Día">▶</button></th>
-                    <th style="padding: 0; position: relative;"><input type="text" class="header-fecha" tabindex="-1"
-                            autocomplete="off"><button class="btn-nuevo-dia" tabindex="-1"
-                            onclick="iniciarNuevoDiaWeb(8)" title="Iniciar Día">▶</button></th>
-                    <th style="padding: 0; position: relative;"><input type="text" class="header-fecha" tabindex="-1"
-                            autocomplete="off"><button class="btn-nuevo-dia" tabindex="-1"
-                            onclick="iniciarNuevoDiaWeb(9)" title="Iniciar Día">▶</button></th>
-                </tr>
-            </thead>
-            <tbody id="grillaFila">
-                <script>
-                    for (let i = 0; i < 26; i++) {
-                        document.write(`
+                <thead>
+                    <tr>
+                        <th style="border-top: none; border-left: none; background: transparent;"></th>
+                        <th colspan="3" class="dark-th" style="padding: 4px;">
+                            <div
+                                style="display: flex; justify-content: center; align-items: center; gap: 6px; color: var(--text-muted); font-size: 10.5px; flex-wrap: nowrap;">
+                                <span>Días:</span>
+                                <input type="number" id="inputDias" tabindex="-1" value="1" min="1" max="10"
+                                    style="width: 38px;">
+                                <span style="opacity: 0.3;">|</span>
+                                <span title="Cálculo parcial por horas para Farmacia 24h (Turno Noche)">Horas:</span>
+                                <select id="selectHorasDespacho" tabindex="-1"
+                                    title="Seleccione horas a cubrir hasta apertura de Farmacia Central"
+                                    style="background: rgba(64, 196, 255, 0.12); color: var(--accent-blue); border: 1px solid var(--accent-blue); border-radius: 6px; padding: 2px 4px; font-size: 11px; font-weight: 900; cursor: pointer; outline: none;">
+                                    <option value="24" selected>24h (1 Día)</option>
+                                    <option value="12">12 hrs</option>
+                                    <option value="8">8 hrs</option>
+                                    <option value="6">6 hrs</option>
+                                </select>
+                            </div>
+                        </th>
+                        <th class="dark-th" style="font-size: 10px;">CDSS</th>
+                        <th class="dark-th">Fecha</th>
+                        <th class="dark-th">Fecha</th>
+                        <th class="dark-th">Fecha</th>
+                        <th class="dark-th">Fecha</th>
+                        <th class="dark-th">Fecha</th>
+                        <th class="dark-th">Fecha</th>
+                        <th class="dark-th">Fecha</th>
+                        <th class="dark-th">Fecha</th>
+                        <th class="dark-th">Fecha</th>
+                        <th class="dark-th">Fecha</th>
+                    </tr>
+                    <tr>
+                        <th style="text-align: left; padding-left: 15px;">
+                            <div class="farmacos-title"><span class="material-icons-round"
+                                    style="color: var(--accent-green);">vaccines</span> Fármacos</div>
+                        </th>
+                        <th>Vía</th>
+                        <th>Dosis</th>
+                        <th>Posología</th>
+                        <th style="font-size: 10px; color: var(--text-muted);">Alerta</th>
+                        <th style="padding: 0; position: relative;"><input type="text" class="header-fecha"
+                                tabindex="-1" autocomplete="off"><button class="btn-nuevo-dia" tabindex="-1"
+                                onclick="iniciarNuevoDiaWeb(0)" title="Iniciar Día">▶</button></th>
+                        <th style="padding: 0; position: relative;"><input type="text" class="header-fecha"
+                                tabindex="-1" autocomplete="off"><button class="btn-nuevo-dia" tabindex="-1"
+                                onclick="iniciarNuevoDiaWeb(1)" title="Iniciar Día">▶</button></th>
+                        <th style="padding: 0; position: relative;"><input type="text" class="header-fecha"
+                                tabindex="-1" autocomplete="off"><button class="btn-nuevo-dia" tabindex="-1"
+                                onclick="iniciarNuevoDiaWeb(2)" title="Iniciar Día">▶</button></th>
+                        <th style="padding: 0; position: relative;"><input type="text" class="header-fecha"
+                                tabindex="-1" autocomplete="off"><button class="btn-nuevo-dia" tabindex="-1"
+                                onclick="iniciarNuevoDiaWeb(3)" title="Iniciar Día">▶</button></th>
+                        <th style="padding: 0; position: relative;"><input type="text" class="header-fecha"
+                                tabindex="-1" autocomplete="off"><button class="btn-nuevo-dia" tabindex="-1"
+                                onclick="iniciarNuevoDiaWeb(4)" title="Iniciar Día">▶</button></th>
+                        <th style="padding: 0; position: relative;"><input type="text" class="header-fecha"
+                                tabindex="-1" autocomplete="off"><button class="btn-nuevo-dia" tabindex="-1"
+                                onclick="iniciarNuevoDiaWeb(5)" title="Iniciar Día">▶</button></th>
+                        <th style="padding: 0; position: relative;"><input type="text" class="header-fecha"
+                                tabindex="-1" autocomplete="off"><button class="btn-nuevo-dia" tabindex="-1"
+                                onclick="iniciarNuevoDiaWeb(6)" title="Iniciar Día">▶</button></th>
+                        <th style="padding: 0; position: relative;"><input type="text" class="header-fecha"
+                                tabindex="-1" autocomplete="off"><button class="btn-nuevo-dia" tabindex="-1"
+                                onclick="iniciarNuevoDiaWeb(7)" title="Iniciar Día">▶</button></th>
+                        <th style="padding: 0; position: relative;"><input type="text" class="header-fecha"
+                                tabindex="-1" autocomplete="off"><button class="btn-nuevo-dia" tabindex="-1"
+                                onclick="iniciarNuevoDiaWeb(8)" title="Iniciar Día">▶</button></th>
+                        <th style="padding: 0; position: relative;"><input type="text" class="header-fecha"
+                                tabindex="-1" autocomplete="off"><button class="btn-nuevo-dia" tabindex="-1"
+                                onclick="iniciarNuevoDiaWeb(9)" title="Iniciar Día">▶</button></th>
+                    </tr>
+                </thead>
+                <tbody id="grillaFila">
+                    <script>
+                        for (let i = 0; i < 26; i++) {
+                            document.write(`
               <tr data-row="${i}">
                 <td><input type="text" class="text-left" data-lista="nombres" autocomplete="off" placeholder="Buscar medicamento..."></td>
                 <td><input type="text" data-lista="vias" autocomplete="off"></td>
@@ -493,10 +511,11 @@
                 <td class="cell-day"><input type="text" autocomplete="off" oninput="this.dataset.manual='true'; syncCheckUI(this)"><button type="button" class="btn-check" tabindex="-1" onclick="toggleTick(this)" title="Marcar como enviado"><span class="material-icons-round">check</span></button></td>
               </tr>
             `);
-                    }
-                </script>
-            </tbody>
-        </table>
+                        }
+                    </script>
+                </tbody>
+            </table>
+        </div>
 
         <div id="firmas-alta"
             style="display: none; justify-content: space-around; margin-top: 8px; page-break-inside: avoid; color: #000;">
@@ -508,7 +527,8 @@
             <div style="width: 35%; text-align: center;">
                 <div style="border-bottom: 2px solid #000; height: 28px; margin-bottom: 4px;"></div>
                 <b style="font-size: 12px;">RESPONSABLE EGRESO (FARMACIA)</b>
-                <div style="font-size: 10px; margin-top: 2px; color: #555;" id="firma-farmacia-nombre">Farmacia Hospital
+                <div style="font-size: 10px; margin-top: 2px; color: #555;" id="firma-farmacia-nombre">Farmacia
+                    Hospital
                     El Pino</div>
             </div>
         </div>
@@ -710,155 +730,189 @@
     </div>
 
     <!-- ================================================================= -->
-  <!-- 7. MÓDULO DE DESPACHO INTEGRADO                                   -->
-  <!-- ================================================================= -->
-  <div id="modalDespachoOverlay" class="modal-overlay" style="z-index: 999999;">
-    <div class="modal-container" style="width: 1000px; max-height: 95vh; padding: 0; overflow: hidden; display: flex; flex-direction: column;">
-      
-      <!-- Cabecera Despacho -->
-      <div class="top-bar-fixed">
-        <div class="header-container" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 15px;">
-          <div class="app-title" style="display: flex; align-items: center; gap: 10px; color: var(--accent-green); flex-shrink: 0;">
-            <span class="material-icons-round mi-icon" style="font-size: 24px; color: var(--accent-blue);">local_shipping</span>
-            <h2 style="margin: 0; font-size: 20px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase;">Módulo de Despacho</h2>
-          </div>
-          
-          <div class="input-pill">
-            <span class="material-icons-round mi-icon" style="font-size: 18px; color: var(--text-muted);">domain</span>
-            <select id="despachoSrvSelect" onchange="despachoSetSrv(this.value)"></select>
-          </div>
-          
-          <button onclick="cerrarDespachoModal()" style="background: rgba(255, 82, 82, 0.15); color: var(--accent-red); border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: 0.2s;">
-            <span class="material-icons-round">close</span>
-          </button>
-        </div>
+    <!-- 7. MÓDULO DE DESPACHO INTEGRADO                                   -->
+    <!-- ================================================================= -->
+    <div id="modalDespachoOverlay" class="modal-overlay" style="z-index: 999999;">
+        <div class="modal-container"
+            style="width: 1000px; max-height: 95vh; padding: 0; overflow: hidden; display: flex; flex-direction: column;">
 
-        <div class="sidebar-tabs despacho-tabs">
-          <button class="tab active" id="btn-nutri" onclick="despachoSetCat('nutri')"><span class="material-icons-round" style="font-size: 18px;">local_dining</span> NUTRICIONES</button>
-          <button class="tab" id="btn-solu" onclick="despachoSetCat('solu')"><span class="material-icons-round" style="font-size: 18px;">water_drop</span> SOLUCIONES</button>
-          <button class="tab" id="btn-stock" onclick="despachoSetCat('stock')"><span class="material-icons-round" style="font-size: 18px;">medication</span> STOCK CLÍNICO</button>
-          <button class="tab total" id="btn-total" onclick="despachoSetCat('total')"><span class="material-icons-round" style="font-size: 18px;">summarize</span> HOJA DE RUTA</button>
-        </div>
-      </div>
+            <!-- Cabecera Despacho -->
+            <div class="top-bar-fixed">
+                <div class="header-container"
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 15px;">
+                    <div class="app-title"
+                        style="display: flex; align-items: center; gap: 10px; color: var(--accent-green); flex-shrink: 0;">
+                        <span class="material-icons-round mi-icon"
+                            style="font-size: 24px; color: var(--accent-blue);">local_shipping</span>
+                        <h2
+                            style="margin: 0; font-size: 20px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase;">
+                            Módulo de Despacho</h2>
+                    </div>
 
-      <!-- Cuerpo Despacho -->
-      <div class="main-content" style="padding: 0 25px 25px 25px; overflow-y: auto;">
-        <div id="despachoContent" class="items-grid"></div>
-        <div id="despachoFooterActions" class="footer-actions"></div>
-      </div>
-      
-    </div>
-  </div>
+                    <div class="input-pill">
+                        <span class="material-icons-round mi-icon"
+                            style="font-size: 18px; color: var(--text-muted);">domain</span>
+                        <select id="despachoSrvSelect" onchange="despachoSetSrv(this.value)"></select>
+                    </div>
 
-  <!-- ================================================================= -->
-  <!-- 9. MODAL DE BANDEJA DE VISACIÓN Y NOTIFICACIONES EN TIEMPO REAL   -->
-  <!-- ================================================================= -->
-  <div id="modal-visacion-qf" class="modal-overlay" style="z-index: 9999999; display: none;">
-    <div class="modal-container" style="width: 780px; max-width: 96vw; max-height: 88vh; display: flex; flex-direction: column;">
-      
-      <div class="modal-header" style="justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-border); padding-bottom: 15px;">
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <span class="material-icons-round icon" style="color: var(--accent-blue); font-size: 38px; background: rgba(64,196,255,0.12); padding: 10px; border-radius: 50%;">verified_user</span>
-          <div>
-            <div id="titulo-modal-visacion" style="font-size: 19px; font-weight: 900; color: var(--text-main); text-transform: uppercase;">
-              CENTRO DE VISACIÓN FARMACOTERAPÉUTICA
+                    <button onclick="cerrarDespachoModal()"
+                        style="background: rgba(255, 82, 82, 0.15); color: var(--accent-red); border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: 0.2s;">
+                        <span class="material-icons-round">close</span>
+                    </button>
+                </div>
+
+                <div class="sidebar-tabs despacho-tabs">
+                    <button class="tab active" id="btn-nutri" onclick="despachoSetCat('nutri')"><span
+                            class="material-icons-round" style="font-size: 18px;">local_dining</span>
+                        NUTRICIONES</button>
+                    <button class="tab" id="btn-solu" onclick="despachoSetCat('solu')"><span
+                            class="material-icons-round" style="font-size: 18px;">water_drop</span> SOLUCIONES</button>
+                    <button class="tab" id="btn-stock" onclick="despachoSetCat('stock')"><span
+                            class="material-icons-round" style="font-size: 18px;">medication</span> STOCK
+                        CLÍNICO</button>
+                    <button class="tab total" id="btn-total" onclick="despachoSetCat('total')"><span
+                            class="material-icons-round" style="font-size: 18px;">summarize</span> HOJA DE RUTA</button>
+                </div>
             </div>
-            <div id="subtitulo-modal-visacion" style="color: var(--text-muted); font-size: 12px; margin-top: 2px;">
-              Solicitudes de medicamentos sujetos a protocolo y respuestas en tiempo real.
+
+            <!-- Cuerpo Despacho -->
+            <div class="main-content" style="padding: 0 25px 25px 25px; overflow-y: auto;">
+                <div id="despachoContent" class="items-grid"></div>
+                <div id="despachoFooterActions" class="footer-actions"></div>
             </div>
-          </div>
+
         </div>
-        <button type="button" onclick="window.cerrarModalBandejaVisacion()" style="background: rgba(255,82,82,0.15); color: var(--accent-red); border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
-          <span class="material-icons-round">close</span>
-        </button>
-      </div>
-
-      <!-- Lista dinámica de solicitudes -->
-      <div id="contenedor-items-visacion" style="flex: 1; overflow-y: auto; max-height: 460px; padding: 10px 5px; display: flex; flex-direction: column; gap: 12px;">
-      </div>
-
-      <div class="modal-actions" style="margin-top: 10px;">
-        <button type="button" class="btn-entendido" style="width: 100%;" onclick="window.cerrarModalBandejaVisacion()">CERRAR BANDEJA</button>
-      </div>
-
     </div>
-  </div>
 
-  <!-- Teclado Numérico Flotante Despacho -->
-  <div id="numpad-overlay" class="numpad-overlay">
-    <div class="numpad-box">
-      <div class="numpad-header">
-        <div class="numpad-title" id="numpad-title">Nombre del Producto</div>
-        <button onclick="closeNumpad()" class="btn-c" style="background: rgba(255, 82, 82, 0.15); color: var(--accent-red); width: 35px; height: 35px; border:none;">X</button>
-      </div>
-      <div class="numpad-display" id="numpad-val">0</div>
-      <div class="keypad-grid">
-        <button class="key-btn" onclick="numpadType('1')">1</button>
-        <button class="key-btn" onclick="numpadType('2')">2</button>
-        <button class="key-btn" onclick="numpadType('3')">3</button>
-        <button class="key-btn" onclick="numpadType('4')">4</button>
-        <button class="key-btn" onclick="numpadType('5')">5</button>
-        <button class="key-btn" onclick="numpadType('6')">6</button>
-        <button class="key-btn" onclick="numpadType('7')">7</button>
-        <button class="key-btn" onclick="numpadType('8')">8</button>
-        <button class="key-btn" onclick="numpadType('9')">9</button>
-        <button class="key-btn del-key" onclick="numpadType('C')">C</button>
-        <button class="key-btn" onclick="numpadType('0')">0</button>
-        <button class="key-btn action-key" onclick="numpadType('DEL')">⌫</button>
-        <button class="key-next" onclick="numpadConfirm()">CONFIRMAR</button>
-      </div>
-    </div>
-  </div>
+    <!-- ================================================================= -->
+    <!-- 9. MODAL DE BANDEJA DE VISACIÓN Y NOTIFICACIONES EN TIEMPO REAL   -->
+    <!-- ================================================================= -->
+    <div id="modal-visacion-qf" class="modal-overlay" style="z-index: 9999999; display: none;">
+        <div class="modal-container"
+            style="width: 780px; max-width: 96vw; max-height: 88vh; display: flex; flex-direction: column;">
 
-  <!-- ================================================================= -->
-  <!-- 8. MODAL DE CONCILIACIÓN ACTIVA (VALIDACIÓN DE ARRASTRE)          -->
-  <!-- ================================================================= -->
-  <div id="modal-conciliacion" class="modal-overlay" style="z-index: 9999999; display: none;">
-    <div class="modal-container" style="width: 880px; max-width: 96vw; max-height: 90vh; display: flex; flex-direction: column;">
-      
-      <div class="modal-header" style="flex-direction: column; justify-content: center; text-align: center; gap: 6px;">
-        <span class="material-icons-round icon" style="color: var(--accent-green); font-size: 44px; background: rgba(0,230,118,0.1); padding: 12px; border-radius: 50%;">fact_check</span>
-        <div>
-          <div style="font-size: 20px; font-weight: 800; color: var(--text-main); text-transform: uppercase;">
-            VALIDACIÓN DE TRATAMIENTO DIARIO
-          </div>
-          <div id="subtitulo-conciliacion" style="color: var(--text-muted); font-size: 13px; margin-top: 3px;">
-            Confirme las unidades a despachar hoy, modifique la cantidad o marque sin indicación.
-          </div>
+            <div class="modal-header"
+                style="justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-border); padding-bottom: 15px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span class="material-icons-round icon"
+                        style="color: var(--accent-blue); font-size: 38px; background: rgba(64,196,255,0.12); padding: 10px; border-radius: 50%;">verified_user</span>
+                    <div>
+                        <div id="titulo-modal-visacion"
+                            style="font-size: 19px; font-weight: 900; color: var(--text-main); text-transform: uppercase;">
+                            CENTRO DE VISACIÓN FARMACOTERAPÉUTICA
+                        </div>
+                        <div id="subtitulo-modal-visacion"
+                            style="color: var(--text-muted); font-size: 12px; margin-top: 2px;">
+                            Solicitudes de medicamentos sujetos a protocolo y respuestas en tiempo real.
+                        </div>
+                    </div>
+                </div>
+                <button type="button" onclick="window.cerrarModalBandejaVisacion()"
+                    style="background: rgba(255,82,82,0.15); color: var(--accent-red); border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                    <span class="material-icons-round">close</span>
+                </button>
+            </div>
+
+            <!-- Lista dinámica de solicitudes -->
+            <div id="contenedor-items-visacion"
+                style="flex: 1; overflow-y: auto; max-height: 460px; padding: 10px 5px; display: flex; flex-direction: column; gap: 12px;">
+            </div>
+
+            <div class="modal-actions" style="margin-top: 10px;">
+                <button type="button" class="btn-entendido" style="width: 100%;"
+                    onclick="window.cerrarModalBandejaVisacion()">CERRAR BANDEJA</button>
+            </div>
+
         </div>
-      </div>
-
-      <!-- Cabecera de columnas -->
-      <div style="display: grid; grid-template-columns: 2.2fr 0.8fr 0.9fr 1.2fr; gap: 10px; padding: 10px 15px; font-size: 11px; font-weight: 800; color: var(--accent-blue); text-transform: uppercase; border-bottom: 1px solid var(--glass-border); margin-top: 10px;">
-        <span>Fármaco / Esquema</span>
-        <span style="text-align: center;">Ayer</span>
-        <span style="text-align: center;">Hoy</span>
-        <span style="text-align: center;">Estado Hoy</span>
-      </div>
-
-      <!-- Contenedor dinámico de filas -->
-      <div id="lista-farmacos-conciliacion" style="flex: 1; overflow-y: auto; max-height: 380px; padding: 8px 10px; display: flex; flex-direction: column; gap: 8px;">
-      </div>
-
-      <!-- Barra para agregar nuevos medicamentos al día actual -->
-      <div style="padding: 8px 10px 0 10px;">
-        <button type="button" onclick="window.agregarFilaNuevaConciliacion()" style="width: 100%; padding: 10px; border-radius: 10px; border: 1.5px dashed var(--accent-blue); background: rgba(64, 196, 255, 0.08); color: var(--accent-blue); font-weight: 800; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: 0.2s;">
-          <span class="material-icons-round" style="font-size: 18px;">add_circle</span>
-          AGREGAR NUEVO MEDICAMENTO A ESTE DÍA
-        </button>
-      </div>
-
-      <!-- Botones de acción -->
-      <div class="modal-actions" style="margin-top: 14px; justify-content: space-between; gap: 15px;">
-        <button type="button" class="btn-entendido" style="flex: 1;" onclick="cerrarModalConciliacion()">CANCELAR</button>
-        <button type="button" class="btn-validar" style="flex: 1.5; background: linear-gradient(135deg, #00e676, #00c853); color: #000; font-weight: 900;" onclick="confirmarConciliacionDia()">
-          <span class="material-icons-round" style="vertical-align: middle; font-size: 18px; margin-right: 4px;">done_all</span>
-          CONFIRMAR Y TRASPASAR AL DÍA
-        </button>
-      </div>
-
     </div>
-  </div>
+
+    <!-- Teclado Numérico Flotante Despacho -->
+    <div id="numpad-overlay" class="numpad-overlay">
+        <div class="numpad-box">
+            <div class="numpad-header">
+                <div class="numpad-title" id="numpad-title">Nombre del Producto</div>
+                <button onclick="closeNumpad()" class="btn-c"
+                    style="background: rgba(255, 82, 82, 0.15); color: var(--accent-red); width: 35px; height: 35px; border:none;">X</button>
+            </div>
+            <div class="numpad-display" id="numpad-val">0</div>
+            <div class="keypad-grid">
+                <button class="key-btn" onclick="numpadType('1')">1</button>
+                <button class="key-btn" onclick="numpadType('2')">2</button>
+                <button class="key-btn" onclick="numpadType('3')">3</button>
+                <button class="key-btn" onclick="numpadType('4')">4</button>
+                <button class="key-btn" onclick="numpadType('5')">5</button>
+                <button class="key-btn" onclick="numpadType('6')">6</button>
+                <button class="key-btn" onclick="numpadType('7')">7</button>
+                <button class="key-btn" onclick="numpadType('8')">8</button>
+                <button class="key-btn" onclick="numpadType('9')">9</button>
+                <button class="key-btn del-key" onclick="numpadType('C')">C</button>
+                <button class="key-btn" onclick="numpadType('0')">0</button>
+                <button class="key-btn action-key" onclick="numpadType('DEL')">⌫</button>
+                <button class="key-next" onclick="numpadConfirm()">CONFIRMAR</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- 8. MODAL DE CONCILIACIÓN ACTIVA (VALIDACIÓN DE ARRASTRE)          -->
+    <!-- ================================================================= -->
+    <div id="modal-conciliacion" class="modal-overlay" style="z-index: 9999999; display: none;">
+        <div class="modal-container"
+            style="width: 880px; max-width: 96vw; max-height: 90vh; display: flex; flex-direction: column;">
+
+            <div class="modal-header"
+                style="flex-direction: column; justify-content: center; text-align: center; gap: 6px;">
+                <span class="material-icons-round icon"
+                    style="color: var(--accent-green); font-size: 44px; background: rgba(0,230,118,0.1); padding: 12px; border-radius: 50%;">fact_check</span>
+                <div>
+                    <div style="font-size: 20px; font-weight: 800; color: var(--text-main); text-transform: uppercase;">
+                        VALIDACIÓN DE TRATAMIENTO DIARIO
+                    </div>
+                    <div id="subtitulo-conciliacion"
+                        style="color: var(--text-muted); font-size: 13px; margin-top: 3px;">
+                        Confirme las unidades a despachar hoy, modifique la cantidad o marque sin indicación.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cabecera de columnas -->
+            <div
+                style="display: grid; grid-template-columns: 2.2fr 0.8fr 0.9fr 1.2fr; gap: 10px; padding: 10px 15px; font-size: 11px; font-weight: 800; color: var(--accent-blue); text-transform: uppercase; border-bottom: 1px solid var(--glass-border); margin-top: 10px;">
+                <span>Fármaco / Esquema</span>
+                <span style="text-align: center;">Ayer</span>
+                <span style="text-align: center;">Hoy</span>
+                <span style="text-align: center;">Estado Hoy</span>
+            </div>
+
+            <!-- Contenedor dinámico de filas -->
+            <div id="lista-farmacos-conciliacion"
+                style="flex: 1; overflow-y: auto; max-height: 380px; padding: 8px 10px; display: flex; flex-direction: column; gap: 8px;">
+            </div>
+
+            <!-- Barra para agregar nuevos medicamentos al día actual -->
+            <div style="padding: 8px 10px 0 10px;">
+                <button type="button" onclick="window.agregarFilaNuevaConciliacion()"
+                    style="width: 100%; padding: 10px; border-radius: 10px; border: 1.5px dashed var(--accent-blue); background: rgba(64, 196, 255, 0.08); color: var(--accent-blue); font-weight: 800; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: 0.2s;">
+                    <span class="material-icons-round" style="font-size: 18px;">add_circle</span>
+                    AGREGAR NUEVO MEDICAMENTO A ESTE DÍA
+                </button>
+            </div>
+
+            <!-- Botones de acción -->
+            <div class="modal-actions" style="margin-top: 14px; justify-content: space-between; gap: 15px;">
+                <button type="button" class="btn-entendido" style="flex: 1;"
+                    onclick="cerrarModalConciliacion()">CANCELAR</button>
+                <button type="button" class="btn-validar"
+                    style="flex: 1.5; background: linear-gradient(135deg, #00e676, #00c853); color: #000; font-weight: 900;"
+                    onclick="confirmarConciliacionDia()">
+                    <span class="material-icons-round"
+                        style="vertical-align: middle; font-size: 18px; margin-right: 4px;">done_all</span>
+                    CONFIRMAR Y TRASPASAR AL DÍA
+                </button>
+            </div>
+
+        </div>
+    </div>
 
     <!-- Conexión a Firebase (Módulos oficiales de Google) -->
     <script type="module">

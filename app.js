@@ -291,6 +291,161 @@ window.mostrarToastFarmacia = function (mensaje, titulo) {
 };
 
 // ============================================================================
+// 📅 MOTOR DE DÍAS INFINITOS (DÍA 11+) Y VENTANA IMPRESA DE 10 DÍAS
+// ============================================================================
+window.obtenerTotalColumnasDia = function () {
+    return document.querySelectorAll(".header-fecha").length || 10;
+};
+
+window.deslizarGrillaAlFinal = function () {
+    const wrapper = document.getElementById("contenedor-scroll-grilla");
+    if (wrapper) {
+        setTimeout(() => { wrapper.scrollLeft = wrapper.scrollWidth; }, 40);
+    }
+};
+
+window.actualizarBotonMasDias = function () {
+    document.querySelectorAll(".btn-agregar-columna-dia").forEach(b => b.remove());
+    const thsSuperiores = document.querySelectorAll("table.med-grid thead tr:nth-child(1) th");
+    if (thsSuperiores.length === 0) return;
+    const ultimoThSuperior = thsSuperiores[thsSuperiores.length - 1];
+    if (!ultimoThSuperior) return;
+
+    ultimoThSuperior.style.position = "relative";
+    const totalActual = window.obtenerTotalColumnasDia();
+
+    const btnMas = document.createElement("button");
+    btnMas.type = "button";
+    btnMas.className = "btn-agregar-columna-dia";
+    btnMas.tabIndex = -1;
+    btnMas.title = `Agregar columna para Día ${totalActual + 1}`;
+    btnMas.textContent = "+";
+    btnMas.onclick = function (e) {
+        e.stopPropagation();
+        window.agregarNuevaColumnaDia(false);
+    };
+    ultimoThSuperior.appendChild(btnMas);
+};
+
+window.agregarNuevaColumnaDia = function (abrirConciliacionInmediata = false) {
+    const tabla = document.querySelector("table.med-grid");
+    if (!tabla) return;
+
+    const nuevoColIndex = window.obtenerTotalColumnasDia();
+    const colgroup = tabla.querySelector("colgroup");
+    const trHead1 = tabla.querySelector("thead tr:nth-child(1)");
+    const trHead2 = tabla.querySelector("thead tr:nth-child(2)");
+    const filasBody = tabla.querySelectorAll("#grillaFila tr");
+
+    // 1. Agregar <col>
+    if (colgroup) {
+        const nuevaCol = document.createElement("col");
+        nuevaCol.style.width = "5.2%";
+        nuevaCol.className = "col-dia-extra";
+        colgroup.appendChild(nuevaCol);
+    }
+
+    // 2. Agregar cabecera "Fecha" uniforme en fila 1
+    if (trHead1) {
+        const th1 = document.createElement("th");
+        th1.className = "dark-th th-dia-extra";
+        th1.textContent = "Fecha";
+        trHead1.appendChild(th1);
+    }
+
+    // 3. Agregar input de fecha + botón ▶ en fila 2
+    if (trHead2) {
+        const th2 = document.createElement("th");
+        th2.className = "th-fecha-extra";
+        th2.style.cssText = "padding: 0; position: relative;";
+        th2.innerHTML = `<input type="text" class="header-fecha" tabindex="-1" autocomplete="off"><button class="btn-nuevo-dia" tabindex="-1" onclick="window.iniciarNuevoDiaWeb(${nuevoColIndex})" title="Iniciar Día ${nuevoColIndex + 1}">▶</button>`;
+        const inpFecha = th2.querySelector(".header-fecha");
+        if (inpFecha) {
+            inpFecha.addEventListener("input", window.programarAutoguardado);
+            inpFecha.addEventListener("change", window.programarAutoguardado);
+        }
+        trHead2.appendChild(th2);
+    }
+
+    // 4. Agregar celda de día en cada una de las 26 filas de medicamentos
+    filasBody.forEach(fila => {
+        const td = document.createElement("td");
+        td.className = "cell-day td-dia-extra";
+        td.innerHTML = `<input type="text" autocomplete="off" oninput="this.dataset.manual='true'; window.syncCheckUI(this)"><button type="button" class="btn-check" tabindex="-1" onclick="window.toggleTick(this)" title="Marcar como enviado"><span class="material-icons-round">check</span></button>`;
+        fila.appendChild(td);
+    });
+
+    window.actualizarBotonMasDias();
+    window.deslizarGrillaAlFinal();
+
+    if (abrirConciliacionInmediata) {
+        window.iniciarNuevoDiaWeb(nuevoColIndex);
+    }
+};
+
+window.asegurarCantidadColumnasDia = function (cantidadRequerida) {
+    const meta = Math.max(10, cantidadRequerida || 10);
+    while (window.obtenerTotalColumnasDia() < meta) {
+        window.agregarNuevaColumnaDia(false);
+    }
+    window.actualizarBotonMasDias();
+};
+
+window.resetearColumnasDiaA10 = function () {
+    document.querySelectorAll(".col-dia-extra, .th-dia-extra, .th-fecha-extra, .td-dia-extra").forEach(el => el.remove());
+    window.actualizarBotonMasDias();
+    const wrapper = document.getElementById("contenedor-scroll-grilla");
+    if (wrapper) wrapper.scrollLeft = 0;
+};
+
+// Antes de imprimir: si hay más de 10 columnas, muestra solo la ventana de los últimos 10 días activos para que la hoja impresa sea 100% idéntica
+window.addEventListener("beforeprint", function () {
+    const headers = Array.from(document.querySelectorAll(".header-fecha"));
+    const totalCols = headers.length;
+    if (totalCols <= 10) return;
+
+    let ultimaColConDatos = 9;
+    headers.forEach((h, idx) => {
+        if (h.value.trim() !== "") ultimaColConDatos = idx;
+    });
+    document.querySelectorAll("#grillaFila tr").forEach(fila => {
+        const inputs = fila.querySelectorAll("input");
+        for (let d = 10; d < totalCols; d++) {
+            if (inputs[5 + d] && inputs[5 + d].value.trim() !== "") {
+                if (d > ultimaColConDatos) ultimaColConDatos = d;
+            }
+        }
+    });
+
+    const finVentana = Math.max(9, ultimaColConDatos);
+    const inicioVentana = finVentana - 9; // Exactamente 10 columnas visibles en el papel
+
+    const tabla = document.querySelector("table.med-grid");
+    if (!tabla) return;
+    const cols = tabla.querySelectorAll("colgroup col");
+    const thsFila1 = tabla.querySelectorAll("thead tr:nth-child(1) th");
+    const thsFila2 = tabla.querySelectorAll("thead tr:nth-child(2) th");
+    const filas = tabla.querySelectorAll("#grillaFila tr");
+
+    for (let d = 0; d < totalCols; d++) {
+        if (d < inicioVentana || d > finVentana) {
+            if (cols[5 + d]) cols[5 + d].classList.add("ocultar-en-impresion-10dias");
+            if (thsFila1[3 + d]) thsFila1[3 + d].classList.add("ocultar-en-impresion-10dias");
+            if (thsFila2[5 + d]) thsFila2[5 + d].classList.add("ocultar-en-impresion-10dias");
+            filas.forEach(f => {
+                if (f.children[5 + d]) f.children[5 + d].classList.add("ocultar-en-impresion-10dias");
+            });
+        }
+    }
+});
+
+window.addEventListener("afterprint", function () {
+    document.querySelectorAll(".ocultar-en-impresion-10dias").forEach(el => el.classList.remove("ocultar-en-impresion-10dias"));
+});
+
+setTimeout(() => window.actualizarBotonMasDias(), 300);
+
+// ============================================================================
 // 3. AUTENTICACIÓN, REGISTRO Y CONFIGURACIÓN MAESTRA (FIRESTORE)
 // ============================================================================
 window.LISTA_SERVICIOS_BASE = ["MEDICINA", "CIRUGIA", "UCI", "UTI", "UCM", "UCE", "MATERNIDAD", "PEDIATRIA", "PENSIONADO", "URGENCIA ADULTO HOSPITALIZADO"];
@@ -493,6 +648,7 @@ window.cerrarSesion = function () {
 
 window.volverAlMenuPrincipal = function () {
     if (typeof window.validarSalidaSegura === "function" && !window.validarSalidaSegura()) return;
+    window.resetearColumnasDiaA10();
     window.limpiarFormularioPerfil();
     document.body.classList.remove("modo-historico");
     window.isModoHistorico = false;
@@ -685,7 +841,7 @@ window.comenzarTurnoWeb = function () {
             usuario.serviciosAsignados = marcadosHoy;
             sessionStorage.setItem("FarmaPerfil_Sesion", JSON.stringify(usuario));
             if (usuario.rut) {
-                updateDoc(doc(window.db, "usuarios", usuario.rut), { serviciosAsignados: marcadosHoy }).catch(() => {});
+                updateDoc(doc(window.db, "usuarios", usuario.rut), { serviciosAsignados: marcadosHoy }).catch(() => { });
             }
         }
     }
@@ -738,7 +894,7 @@ window.limpiarFormularioPerfil = function () {
     clearTimeout(window.temporizadorGuardado);
     window.hayCambiosSinGuardar = false;
     window.datosSincronizados = true;
-
+    window.resetearColumnasDiaA10();
     document.getElementById("rut").value = "";
     document.getElementById("rut").classList.remove("input-warning");
     document.getElementById("paciente").value = "";
@@ -830,6 +986,14 @@ window.cargarTratamientoPacienteCama = async function () {
             document.getElementById("alergiaPaciente").value = res.alergia || "";
             document.getElementById("genero").value = res.genero || "";
 
+            let maxDiasGuardados = res.fechasCabecera ? res.fechasCabecera.length : 10;
+            if (res.medicamentos) {
+                res.medicamentos.forEach(m => {
+                    if (m.dias && m.dias.length > maxDiasGuardados) maxDiasGuardados = m.dias.length;
+                });
+            }
+            window.asegurarCantidadColumnasDia(maxDiasGuardados);
+
             const inputsFecha = document.querySelectorAll(".header-fecha");
             if (res.fechasCabecera) {
                 res.fechasCabecera.forEach((fec, idx) => {
@@ -837,6 +1001,7 @@ window.cargarTratamientoPacienteCama = async function () {
                 });
             }
 
+            const totalCols = window.obtenerTotalColumnasDia();
             const filas = document.querySelectorAll("#grillaFila tr");
             if (res.medicamentos) {
                 res.medicamentos.forEach((med, idx) => {
@@ -847,12 +1012,13 @@ window.cargarTratamientoPacienteCama = async function () {
                         inputs[2].value = med.dosis || "";
                         inputs[3].value = med.posologia || "";
 
-                        for (let d = 0; d < 10; d++) {
+                        for (let d = 0; d < totalCols; d++) {
                             if (inputs[5 + d] && med.dias && med.dias[d] !== undefined) {
                                 inputs[5 + d].value = med.dias[d];
                                 window.syncCheckUI(inputs[5 + d]);
                             }
                         }
+            if (maxDiasGuardados > 10) window.deslizarGrillaAlFinal();
                         // Evaluar estado visual CDSS sin disparar modal molesto al cargar
                         if (med.farmaco && med.posologia) {
                             window.evaluarCDSSLocal(filas[idx], med.farmaco, med.posologia, "", med.dosis, true);
@@ -869,7 +1035,7 @@ window.cargarTratamientoPacienteCama = async function () {
             let rutLegacy = document.getElementById("rut").value.trim() || idCama;
             const pendientesNube = (docSnap && docSnap.exists() && docSnap.data().medicamentosPendientes) ? docSnap.data().medicamentosPendientes : {};
             const pendientesLocal = JSON.parse(localStorage.getItem("pendientes_" + llaveMaestra)) ||
-                                    JSON.parse(localStorage.getItem("pendientes_" + rutLegacy)) || {};
+                JSON.parse(localStorage.getItem("pendientes_" + rutLegacy)) || {};
             window.medicamentosPendientes = { ...pendientesLocal, ...pendientesNube };
 
             window.actualizarSaldosYSidebar();
@@ -925,7 +1091,8 @@ window.ejecutarGuardadoSilencioso = async function (servicio, cama) {
                     posologia: inputs[3].value.trim(),
                     dias: []
                 };
-                for (let i = 0; i < 10; i++) {
+                const totalCols = window.obtenerTotalColumnasDia();
+                for (let i = 0; i < totalCols; i++) {
                     let cellVal = "";
                     if (inputs[5 + i]) {
                         cellVal = inputs[5 + i].value.trim();
@@ -1359,7 +1526,8 @@ window.actualizarSaldosYSidebar = function () {
 
     let colActiva = 0;
     const headersF = document.querySelectorAll(".header-fecha");
-    for (let i = 0; i < 10; i++) {
+    const totalCols = headersF.length;
+    for (let i = 0; i < totalCols; i++) {
         if (headersF[i].value.trim() !== "") colActiva = i;
     }
     let limiteColumnas = colActiva + 1;
@@ -1439,7 +1607,7 @@ window.actualizarSaldosYSidebar = function () {
                 let diasDuracionUnFrasco = Math.floor(multiData.capacidad / dosisDiaria);
 
                 for (let d = colActiva; d < limiteColumnas; d++) {
-                    if (d > 9) break;
+                    if (d >= totalCols) break;
                     let celdaDia = inputs[5 + d];
                     if (!celdaDia) break;
                     if (celdaDia.dataset.manual === "true") {
@@ -1462,7 +1630,7 @@ window.actualizarSaldosYSidebar = function () {
                     balanceActual -= consumoTotal;
                     window.syncCheckUI(celdaDia);
                 }
-                for (let d = limiteColumnas; d < 10; d++) { if (inputs[5 + d] && inputs[5 + d].dataset.manual !== "true") { inputs[5 + d].value = ""; window.syncCheckUI(inputs[5 + d]); } }
+                for (let d = limiteColumnas; d < totalCols; d++) { if (inputs[5 + d] && inputs[5 + d].dataset.manual !== "true") { inputs[5 + d].value = ""; window.syncCheckUI(inputs[5 + d]); } }
                 window.nuevosSaldosParaManana[multiData.clave] = balanceActual;
 
                 htmlSaldos += `
@@ -1500,7 +1668,7 @@ window.actualizarSaldosYSidebar = function () {
                 let diasDuracionUnFrasco = Math.floor(liqData.total / consumoDiario);
 
                 for (let d = colActiva; d < limiteColumnas; d++) {
-                    if (d > 9) break;
+                    if (d >= totalCols) break;
                     let celdaDia = inputs[5 + d];
                     if (!celdaDia) break;
                     if (celdaDia.dataset.manual === "true") {
@@ -1523,7 +1691,7 @@ window.actualizarSaldosYSidebar = function () {
                     balanceActual -= consumoTotal;
                     window.syncCheckUI(celdaDia);
                 }
-                for (let d = limiteColumnas; d < 10; d++) { if (inputs[5 + d] && inputs[5 + d].dataset.manual !== "true") { inputs[5 + d].value = ""; window.syncCheckUI(inputs[5 + d]); } }
+                for (let d = limiteColumnas; d < totalCols; d++) { if (inputs[5 + d] && inputs[5 + d].dataset.manual !== "true") { inputs[5 + d].value = ""; window.syncCheckUI(inputs[5 + d]); } }
                 window.nuevosSaldosParaManana[liqName] = balanceActual;
 
                 htmlSaldos += `
@@ -1567,7 +1735,7 @@ window.actualizarSaldosYSidebar = function () {
                 let colorBadge = esNutricion ? "#ff9800" : "#40c4ff";
 
                 for (let d = colActiva; d < limiteColumnas; d++) {
-                    if (d > 9) break;
+                    if (d >= totalCols) break;
                     let celdaDia = inputs[5 + d];
                     if (celdaDia && celdaDia.dataset.manual !== "true") {
                         celdaDia.value = frascosPorDia;
@@ -1576,7 +1744,7 @@ window.actualizarSaldosYSidebar = function () {
                         window.syncCheckUI(celdaDia);
                     }
                 }
-                for (let d = limiteColumnas; d < 10; d++) { if (inputs[5 + d] && inputs[5 + d].dataset.manual !== "true") { inputs[5 + d].value = ""; window.syncCheckUI(inputs[5 + d]); } }
+                for (let d = limiteColumnas; d < totalCols; d++) { if (inputs[5 + d] && inputs[5 + d].dataset.manual !== "true") { inputs[5 + d].value = ""; window.syncCheckUI(inputs[5 + d]); } }
 
                 htmlSaldos += `
                   <div class="nutricion-item" style="border-left: 4px solid ${colorBadge}; display:block;">
@@ -2834,13 +3002,13 @@ document.getElementById("grillaFila").addEventListener("change", function (e) {
     const inputs = fila.querySelectorAll("input");
     const colIndex = Array.from(inputs).indexOf(celdaModificada);
 
-    if (colIndex >= 5 && colIndex <= 14) {
+    if (colIndex >= 5) {
         celdaModificada.dataset.manual = "true";
         window.actualizarSaldosYSidebar();
         window.programarAutoguardado();
         return;
     } else if (colIndex >= 0 && colIndex <= 3) {
-        for (let d = 5; d <= 14; d++) { if (inputs[d]) delete inputs[d].dataset.manual; }
+        for (let d = 5; d < inputs.length; d++) { if (inputs[d]) delete inputs[d].dataset.manual; }
     }
 
     const rowId = fila.dataset.row;
@@ -2861,7 +3029,7 @@ document.getElementById("grillaFila").addEventListener("change", function (e) {
         }
     }
 
-    // Autolimpieza si borran el fármaco
+    // Autolimpieza si borran el fármaco (ahora limpia hasta el último día infinito)
     const celdaResultado = inputs[4];
     const contenedorAlerta = fila.querySelector(".mensaje-reaccion");
     if (!inputs[0].value.trim()) {
@@ -2871,7 +3039,15 @@ document.getElementById("grillaFila").addEventListener("change", function (e) {
         celdaResultado.value = "";
         celdaResultado.classList.remove("alerta-sobredosis", "alerta-interaccion", "alerta-alergia");
         if (contenedorAlerta) contenedorAlerta.style.display = "none";
-        for (let d = 0; d < 10; d++) { if (inputs[5 + d]) { inputs[5 + d].value = ""; window.syncCheckUI(inputs[5 + d]); } }
+        for (let d = 5; d < inputs.length; d++) {
+            if (inputs[d]) {
+                inputs[d].value = "";
+                window.syncCheckUI(inputs[d]);
+            }
+        }
+        if (typeof window.limpiarSolicitudVisacionPorResolucionLocal === "function") {
+            window.limpiarSolicitudVisacionPorResolucionLocal(rowId, "");
+        }
         window.actualizarSaldosYSidebar();
         window.escanearInteraccionesGlobales();
         window.escanearAlergias();
@@ -2940,7 +3116,7 @@ document.getElementById("grillaFila").addEventListener("change", function (e) {
     if (medTexto && posoTexto) {
         let colActiva = 0;
         const headersF = document.querySelectorAll(".header-fecha");
-        for (let i = 0; i < 10; i++) { if (headersF[i].value.trim() !== "") colActiva = i; }
+        for (let i = 0; i < headersF.length; i++) { if (headersF[i].value.trim() !== "") colActiva = i; }
 
         const diasADespachar = window.obtenerFactorDespachoActivo();
         let totalDiarioUnidades = window.calcularDosisFila(medTexto, viaTexto, dosisTexto, posoTexto, diasADespachar, rowId);
@@ -2948,7 +3124,7 @@ document.getElementById("grillaFila").addEventListener("change", function (e) {
         if (totalDiarioUnidades !== "") {
             let limiteColumnas = colActiva + 1;
             for (let d = colActiva; d < limiteColumnas; d++) {
-                if (d > 9) break;
+                if (d >= headersF.length) break;
                 let celdaDia = inputs[5 + d];
                 if (celdaDia && celdaDia.dataset.manual !== "true" && (celdaDia.value === "" || !isNaN(celdaDia.value))) {
                     celdaDia.value = totalDiarioUnidades;
@@ -2957,7 +3133,7 @@ document.getElementById("grillaFila").addEventListener("change", function (e) {
                     window.syncCheckUI(celdaDia);
                 }
             }
-            for (let d = limiteColumnas; d < 10; d++) {
+            for (let d = limiteColumnas; d < headersF.length; d++) {
                 if (inputs[5 + d] && inputs[5 + d].dataset.manual !== "true") {
                     inputs[5 + d].value = "";
                     window.syncCheckUI(inputs[5 + d]);
@@ -2970,6 +3146,9 @@ document.getElementById("grillaFila").addEventListener("change", function (e) {
         window.escanearInteraccionesGlobales();
         window.escanearAlergias();
         window.escanearRestringidos();
+
+        // 🌟 Si el paciente va en el Día 11 o superior, desliza la vista automáticamente al final para ver el cálculo
+        if (colActiva >= 10) window.deslizarGrillaAlFinal();
     }
     window.programarAutoguardado();
 });
@@ -5345,11 +5524,22 @@ window.cargarPerfilHistorico = async function (idDocBuscado) {
             selectCama.innerHTML = `<option value="${res.cama}">${res.cama}</option>`;
             selectCama.value = res.cama;
 
+            let maxDiasGuardados = res.fechasCabecera ? res.fechasCabecera.length : 10;
+            if (res.medicamentos) {
+                res.medicamentos.forEach(m => {
+                    if (m.dias && m.dias.length > maxDiasGuardados) maxDiasGuardados = m.dias.length;
+                });
+            }
+            window.asegurarCantidadColumnasDia(maxDiasGuardados);
+
             const inputsFecha = document.querySelectorAll(".header-fecha");
             if (res.fechasCabecera) {
-                res.fechasCabecera.forEach((fec, idx) => { if (inputsFecha[idx]) inputsFecha[idx].value = fec; });
+                res.fechasCabecera.forEach((fec, idx) => {
+                    if (inputsFecha[idx]) inputsFecha[idx].value = fec;
+                });
             }
 
+            const totalCols = window.obtenerTotalColumnasDia();
             const filas = document.querySelectorAll("#grillaFila tr");
             if (res.medicamentos) {
                 res.medicamentos.forEach((med, idx) => {
@@ -5359,7 +5549,8 @@ window.cargarPerfilHistorico = async function (idDocBuscado) {
                         inputs[1].value = med.via || "";
                         inputs[2].value = med.dosis || "";
                         inputs[3].value = med.posologia || "";
-                        for (let d = 0; d < 10; d++) {
+
+                        for (let d = 0; d < totalCols; d++) {
                             if (inputs[5 + d] && med.dias && med.dias[d] !== undefined) {
                                 inputs[5 + d].value = med.dias[d];
                                 window.syncCheckUI(inputs[5 + d]);
@@ -5738,7 +5929,7 @@ window.iniciarRadarVisacionTiempoReal = function () {
                     }
 
                     // Marcar como notificado en Firestore
-                    updateDoc(doc(window.db, "solicitudes_qf", sol.idSolicitud), { notificadoAlTens: true }).catch(() => {});
+                    updateDoc(doc(window.db, "solicitudes_qf", sol.idSolicitud), { notificadoAlTens: true }).catch(() => { });
                 }
 
                 // Si el paciente está abierto en este momento en pantalla, aplicar el cambio en vivo sin recargar
@@ -5801,7 +5992,8 @@ window.aplicarResolucionQFEnCamaAbierta = function (sol) {
             // Bloquear la celda del día activo con S/I para prevenir dispensación errónea
             let colActiva = 0;
             const headersF = document.querySelectorAll(".header-fecha");
-            for (let i = 0; i < 10; i++) { if (headersF[i].value.trim() !== "") colActiva = i; }
+            const totalCols = window.obtenerTotalColumnasDia();
+            for (let i = 0; i < totalCols; i++) { if (headersF[i].value.trim() !== "") colActiva = i; }
             if (inputs[5 + colActiva]) {
                 inputs[5 + colActiva].value = "S/I";
                 window.syncCheckUI(inputs[5 + colActiva]);
@@ -5873,8 +6065,8 @@ window.actualizarBadgeCampanaVisacion = function () {
         conteoNoVistas = window.solicitudesVisacionCache.filter(s => {
             const claveVista = `${s.idSolicitud}_${s.estado}_${s.timestampResolucion || s.timestamp}`;
             return s.estado === "PENDIENTE" &&
-                   misServiciosQF.includes((s.servicio || "").toUpperCase()) &&
-                   !window.notificacionesVistasSet.has(claveVista);
+                misServiciosQF.includes((s.servicio || "").toUpperCase()) &&
+                !window.notificacionesVistasSet.has(claveVista);
         }).length;
     } else {
         // Para el TENS: cuenta notificaciones nuevas o resueltas que aún no haya abierto en la campana
@@ -6002,9 +6194,9 @@ window.renderizarBandejaVisacion = function () {
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px; font-size: 11.5px; color: var(--text-muted);">
                     <span>
                         ${esPendiente
-                            ? `⏳ Esperando revisión del Químico Farmacéutico (o puedes resolverlo directo en cama)...`
-                            : `Resuelto por QF <b>${sol.resueltoPorQF}</b> ${sol.medicoAutorizador ? `· Autoriza: <b>${sol.medicoAutorizador}</b>` : ""} ${sol.observacionQF ? `· Nota: <b>${sol.observacionQF}</b>` : ""}`
-                        }
+                    ? `⏳ Esperando revisión del Químico Farmacéutico (o puedes resolverlo directo en cama)...`
+                    : `Resuelto por QF <b>${sol.resueltoPorQF}</b> ${sol.medicoAutorizador ? `· Autoriza: <b>${sol.medicoAutorizador}</b>` : ""} ${sol.observacionQF ? `· Nota: <b>${sol.observacionQF}</b>` : ""}`
+                }
                     </span>
                     <div style="display: flex; gap: 6px;">
                         <button type="button" onclick="window.irAPacienteDesdeVisacion('${sol.servicio}', '${sol.cama}')" style="background: rgba(64,196,255,0.15); color: var(--accent-blue); border: 1px solid var(--accent-blue); padding: 5px 10px; border-radius: 6px; font-weight: 800; font-size: 10.5px; cursor: pointer;">
@@ -6150,7 +6342,7 @@ window.archivarTodasVisacionesVisibles = async function () {
     });
 
     for (const sol of aBorrar) {
-        await deleteDoc(doc(window.db, "solicitudes_qf", sol.idSolicitud)).catch(() => {});
+        await deleteDoc(doc(window.db, "solicitudes_qf", sol.idSolicitud)).catch(() => { });
     }
 };
 

@@ -896,3 +896,227 @@ body.light-theme .input-nuevo-concil {
     border-left-color: var(--accent-red);
     background: rgba(255, 82, 82, 0.06);
 }
+
+/* =========================================================
+   MODO DIGITAL INFINITO: SCROLL HORIZONTAL + COLUMNAS FIJAS
+   ========================================================= */
+.med-grid-scroll-wrapper {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    position: relative;
+    scroll-behavior: smooth;
+    box-sizing: border-box;
+}
+
+/* CRÍTICO PARA SAFARI/CHROME: overflow: visible y border-collapse: separate permiten que position: sticky jamás se desplace */
+.med-grid-scroll-wrapper table.med-grid {
+    border: none !important;
+    border-radius: 0 !important;
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    overflow: visible !important;
+    table-layout: fixed !important;
+    width: max-content !important;
+    min-width: 100% !important;
+    margin-bottom: 0 !important;
+}
+
+/* 1. ANCHOS RÍGIDOS DIRECTOS EN CELDAS (Evita que las columnas se encojan o se desfasen al agregar 30+ días) */
+/* Columna 1: Fármacos (240px) */
+.med-grid col:nth-child(1),
+.med-grid thead tr:nth-child(1) th:nth-child(1),
+.med-grid thead tr:nth-child(2) th:nth-child(1),
+.med-grid tbody td:nth-child(1) {
+    width: 240px !important;
+    min-width: 240px !important;
+    max-width: 240px !important;
+    box-sizing: border-box !important;
+}
+
+/* Columna 2: Vía (50px) */
+.med-grid col:nth-child(2),
+.med-grid thead tr:nth-child(2) th:nth-child(2),
+.med-grid tbody td:nth-child(2) {
+    width: 50px !important;
+    min-width: 50px !important;
+    max-width: 50px !important;
+    box-sizing: border-box !important;
+}
+
+/* Columna 3: Dosis (75px) */
+.med-grid col:nth-child(3),
+.med-grid thead tr:nth-child(2) th:nth-child(3),
+.med-grid tbody td:nth-child(3) {
+    width: 75px !important;
+    min-width: 75px !important;
+    max-width: 75px !important;
+    box-sizing: border-box !important;
+}
+
+/* Columna 4: Posología (90px) */
+.med-grid col:nth-child(4),
+.med-grid thead tr:nth-child(2) th:nth-child(4),
+.med-grid tbody td:nth-child(4) {
+    width: 90px !important;
+    min-width: 90px !important;
+    max-width: 90px !important;
+    box-sizing: border-box !important;
+}
+
+/* Cabecera superior que abarca Vía + Dosis + Posología (50 + 75 + 90 = 215px) */
+.med-grid thead tr:nth-child(1) th:nth-child(2) {
+    width: 215px !important;
+    min-width: 215px !important;
+    max-width: 215px !important;
+    box-sizing: border-box !important;
+}
+
+/* Columnas de Días (Día 1 al Infinito: 64px cada una) */
+.med-grid col:nth-child(n+6),
+.med-grid thead tr:nth-child(1) th:nth-child(n+4),
+.med-grid thead tr:nth-child(2) th:nth-child(n+6),
+.med-grid tbody td:nth-child(n+6) {
+    width: 64px !important;
+    min-width: 64px !important;
+    max-width: 64px !important;
+    box-sizing: border-box !important;
+}
+
+/* 2. POSICIONAMIENTO STICKY EXACTO AL MILÍMETRO (0px -> 240px -> 290px -> 365px) */
+.med-grid thead tr:nth-child(1) th:nth-child(1),
+.med-grid thead tr:nth-child(2) th:nth-child(1),
+.med-grid tbody td:nth-child(1) {
+    position: -webkit-sticky !important;
+    position: sticky !important;
+    left: 0px !important;
+    z-index: 20 !important;
+}
+
+.med-grid thead tr:nth-child(1) th:nth-child(2) {
+    position: -webkit-sticky !important;
+    position: sticky !important;
+    left: 240px !important;
+    z-index: 21 !important;
+    border-right: 2px solid var(--accent-blue) !important;
+}
+
+.med-grid thead tr:nth-child(2) th:nth-child(2),
+.med-grid tbody td:nth-child(2) {
+    position: -webkit-sticky !important;
+    position: sticky !important;
+    left: 240px !important;
+    z-index: 20 !important;
+}
+
+.med-grid thead tr:nth-child(2) th:nth-child(3),
+.med-grid tbody td:nth-child(3) {
+    position: -webkit-sticky !important;
+    position: sticky !important;
+    left: 290px !important;
+    z-index: 20 !important;
+}
+
+.med-grid thead tr:nth-child(2) th:nth-child(4),
+.med-grid tbody td:nth-child(4) {
+    position: -webkit-sticky !important;
+    position: sticky !important;
+    left: 365px !important;
+    z-index: 20 !important;
+    border-right: 2px solid var(--accent-blue) !important;
+    box-shadow: 4px 0 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* 3. FONDO SÓLIDO INTEGRADO AL TEMA (Para que las fechas pasen por debajo sin transparentarse) */
+.med-grid tbody td:nth-child(1),
+.med-grid tbody td:nth-child(2),
+.med-grid tbody td:nth-child(3),
+.med-grid tbody td:nth-child(4) {
+    background-color: #162831 !important;
+}
+body.light-theme .med-grid tbody td:nth-child(1),
+body.light-theme .med-grid tbody td:nth-child(2),
+body.light-theme .med-grid tbody td:nth-child(3),
+body.light-theme .med-grid tbody td:nth-child(4) {
+    background-color: #e4eef7 !important;
+}
+
+.med-grid thead tr:nth-child(1) th:nth-child(1),
+.med-grid thead tr:nth-child(1) th:nth-child(2),
+.med-grid thead tr:nth-child(2) th:nth-child(1),
+.med-grid thead tr:nth-child(2) th:nth-child(2),
+.med-grid thead tr:nth-child(2) th:nth-child(3),
+.med-grid thead tr:nth-child(2) th:nth-child(4) {
+    background-color: #12222a !important;
+}
+body.light-theme .med-grid thead tr:nth-child(1) th:nth-child(1),
+body.light-theme .med-grid thead tr:nth-child(1) th:nth-child(2),
+body.light-theme .med-grid thead tr:nth-child(2) th:nth-child(1),
+body.light-theme .med-grid thead tr:nth-child(2) th:nth-child(2),
+body.light-theme .med-grid thead tr:nth-child(2) th:nth-child(3),
+body.light-theme .med-grid thead tr:nth-child(2) th:nth-child(4) {
+    background-color: #d5e4f2 !important;
+}
+
+/* Botón "+" en la esquina derecha del encabezado superior "Fecha" de la última columna */
+.btn-agregar-columna-dia {
+    position: absolute;
+    right: 2px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--accent-blue);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    width: 16px;
+    height: 16px;
+    font-size: 13px;
+    font-weight: 900;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 12;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+}
+.btn-agregar-columna-dia:hover {
+    background: var(--accent-green);
+    color: #000;
+    transform: translateY(-50%) scale(1.1);
+}
+
+/* =========================================================
+   BLINDAJE DE IMPRESIÓN: SIEMPRE FORMATO EXACTO DE 10 DÍAS
+   ========================================================= */
+@media print {
+    .med-grid-scroll-wrapper {
+        overflow: visible !important;
+        border: none !important;
+    }
+    .med-grid-scroll-wrapper table.med-grid {
+        width: 100% !important;
+        min-width: 100% !important;
+        border-collapse: collapse !important;
+        border: 2px solid #000000 !important;
+    }
+    .med-grid th, .med-grid td {
+        position: static !important;
+        box-shadow: none !important;
+        background: transparent !important;
+        min-width: 0 !important;
+        max-width: none !important;
+    }
+    .med-grid col:nth-child(1), .med-grid tbody td:nth-child(1) { width: 28% !important; }
+    .med-grid col:nth-child(2), .med-grid tbody td:nth-child(2) { width: 5% !important; }
+    .med-grid col:nth-child(4), .med-grid tbody td:nth-child(4) { width: 9% !important; }
+    .med-grid col:nth-child(n+6), .med-grid tbody td:nth-child(n+6) { width: 5.8% !important; }
+    .btn-agregar-columna-dia,
+    .ocultar-en-impresion-10dias {
+        display: none !important;
+    }
+}
