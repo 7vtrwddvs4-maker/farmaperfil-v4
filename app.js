@@ -399,7 +399,21 @@ window.resetearColumnasDiaA10 = function () {
 };
 
 // Antes de imprimir: si hay más de 10 columnas, muestra solo la ventana de los últimos 10 días activos para que la hoja impresa sea 100% idéntica
+window.scrollPrevioImpresion = 0;
+
 window.addEventListener("beforeprint", function () {
+    // 1. Guardar posición del scroll horizontal y ponerlo en 0 para que Chrome no corte la tabla en el papel
+    const wrapper = document.getElementById("contenedor-scroll-grilla");
+    if (wrapper) {
+        window.scrollPrevioImpresion = wrapper.scrollLeft;
+        wrapper.scrollLeft = 0;
+    }
+
+    // 2. Ajustar colspan de la cabecera superior (de 3 a 2 porque "Dosis" se oculta al imprimir)
+    const thDias = document.querySelector(".med-grid thead tr:nth-child(1) th:nth-child(2)");
+    if (thDias) thDias.setAttribute("colspan", "2");
+
+    // 3. Si hay más de 10 columnas digitales, mostrar en el papel solo la ventana de los últimos 10 días activos
     const headers = Array.from(document.querySelectorAll(".header-fecha"));
     const totalCols = headers.length;
     if (totalCols <= 10) return;
@@ -440,7 +454,13 @@ window.addEventListener("beforeprint", function () {
 });
 
 window.addEventListener("afterprint", function () {
+    const thDias = document.querySelector(".med-grid thead tr:nth-child(1) th:nth-child(2)");
+    if (thDias) thDias.setAttribute("colspan", "3");
+
     document.querySelectorAll(".ocultar-en-impresion-10dias").forEach(el => el.classList.remove("ocultar-en-impresion-10dias"));
+
+    const wrapper = document.getElementById("contenedor-scroll-grilla");
+    if (wrapper) wrapper.scrollLeft = window.scrollPrevioImpresion || 0;
 });
 
 setTimeout(() => window.actualizarBotonMasDias(), 300);
