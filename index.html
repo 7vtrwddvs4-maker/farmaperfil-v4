@@ -81,6 +81,14 @@
                         <a href="#" onclick="olvidePin()"
                             style="color: var(--text-muted); text-decoration: none;">¿Olvidó su PIN?</a>
                     </div>
+
+                    <div style="margin-top: 20px; padding-top: 15px; border-top: 1px dashed var(--glass-border);">
+                        <button type="button" onclick="window.imprimirPlantillaBlanco()"
+                            style="width: 100%; padding: 10px 14px; border-radius: 10px; border: 1.5px dashed var(--accent-blue); background: rgba(64, 196, 255, 0.08); color: var(--accent-blue); font-weight: 800; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.2s;">
+                            <span class="material-icons-round" style="font-size: 18px;">print</span>
+                            IMPRIMIR PLANTILLA EN BLANCO
+                        </button>
+                    </div>
                 </div>
 
                 <!-- PASO 2: FORMULARIO DE REGISTRO OCULTO -->
@@ -169,6 +177,15 @@
                             <span class="material-icons-round"
                                 style="vertical-align: middle; font-size: 18px; margin-right: 5px;">person_search</span>
                             BÚSQUEDA
+                        </button>
+                    </div>
+
+                    <!-- BOTÓN DE IMPRESIÓN DE PLANTILLA EN BLANCO -->
+                    <div style="margin-top: 15px;">
+                        <button type="button" onclick="window.imprimirPlantillaBlanco()"
+                            style="width: 100%; padding: 10px 14px; border-radius: 10px; border: 1.5px dashed var(--accent-blue); background: rgba(64, 196, 255, 0.08); color: var(--accent-blue); font-weight: 800; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.2s;">
+                            <span class="material-icons-round" style="font-size: 18px;">print</span>
+                            IMPRIMIR PLANTILLA EN BLANCO
                         </button>
                     </div>
                 </div>
@@ -375,13 +392,18 @@
 
         <div
             style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; margin-bottom: 10px;">
-            <div style="display: flex; gap: 15px;">
+            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
                 <button class="btn-gestion-cama" tabindex="-1" onclick="abrirModalGestion()">
                     <span class="material-icons-round">manage_accounts</span> GESTIÓN DE CAMA / EGRESO
                 </button>
                 <button class="btn-gestion-cama" tabindex="-1"
                     style="background: linear-gradient(135deg, #34c759, #28a745);" onclick="abrirDespachoModal()">
                     <span class="material-icons-round">local_shipping</span> MÓDULO DE DESPACHO
+                </button>
+                <button class="btn-gestion-cama" tabindex="-1"
+                    style="background: linear-gradient(135deg, #7c4dff, #512da8); box-shadow: 0 4px 15px rgba(124, 77, 255, 0.3);"
+                    onclick="window.abrirModalConsolidadoServicio()">
+                    <span class="material-icons-round">fact_check</span> CONSOLIDADO SERVICIO
                 </button>
             </div>
 

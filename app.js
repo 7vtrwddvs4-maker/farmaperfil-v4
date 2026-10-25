@@ -6386,3 +6386,417 @@ window.irAPacienteDesdeVisacion = function (servicio, cama) {
     window.cerrarModalBandejaVisacion();
     window.irAPacienteCenso(servicio, cama);
 };
+
+// ============================================================================
+// 19. MOTOR DE CONSOLIDADO DE MEDICAMENTOS POR SERVICIO (REBAJA DE STOCK)
+// ============================================================================
+window.datosConsolidadoServicioActual = {
+    servicio: "",
+    fechaSeleccionada: "",
+    fechasDisponibles: [],
+    camasPorFecha: {},
+    itemsConsolidados: []
+};
+
+window.formatearFechaCortaHoy = function () {
+    const hoy = new Date();
+    const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+    return `${hoy.getDate()}-${meses[hoy.getMonth()]}`;
+};
+
+window.abrirModalConsolidadoServicio = async function () {
+    const servicioActivo = (document.getElementById("servicio")?.value || "").trim().toUpperCase();
+    if (!servicioActivo) {
+        alert("⚠️ Seleccione primero un Servicio Clínico para calcular su consolidado.");
+        return;
+    }
+
+    let modal = document.getElementById("modal-consolidado-servicio");
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "modal-consolidado-servicio";
+        modal.className = "modal-overlay";
+        modal.style.cssText = "z-index: 9999999; display: none;";
+        modal.innerHTML = `
+            <div class="modal-container" style="width: 860px; max-width: 96vw; max-height: 90vh; display: flex; flex-direction: column;">
+                <div class="modal-header" style="justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-border); padding-bottom: 15px;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span class="material-icons-round icon" style="color: #b388ff; font-size: 38px; background: rgba(124, 77, 255, 0.15); padding: 10px; border-radius: 50%;">inventory</span>
+                        <div>
+                            <div id="titulo-modal-consolidado" style="font-size: 19px; font-weight: 900; color: var(--text-main); text-transform: uppercase;">
+                                CONSOLIDADO DE MEDICAMENTOS ENTREGADOS
+                            </div>
+                            <div id="subtitulo-modal-consolidado" style="color: var(--text-muted); font-size: 12px; margin-top: 2px;">
+                                Sumatoria automática de unidades despachadas en todas las camas del servicio para rebaja de stock.
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" onclick="window.cerrarModalConsolidadoServicio()" style="background: rgba(255,82,82,0.15); color: var(--accent-red); border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                        <span class="material-icons-round">close</span>
+                    </button>
+                </div>
+
+                <!-- Barra de controles: Servicio, Fecha de Despacho y Buscador Rápido -->
+                <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; background: rgba(0,0,0,0.2); padding: 12px 15px; border-radius: 12px; margin-top: 12px; border: 1px solid var(--glass-border);">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="font-size: 11px; font-weight: 800; color: var(--accent-blue); text-transform: uppercase;">Servicio:</span>
+                        <select id="select-consolidado-servicio" class="login-input" style="margin: 0; padding: 6px 10px; font-size: 12px; font-weight: 800; width: auto;" onchange="window.cargarDatosConsolidadoServicio(this.value)"></select>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="font-size: 11px; font-weight: 800; color: var(--accent-green); text-transform: uppercase;">Fecha a Rebajar:</span>
+                        <select id="select-consolidado-fecha" class="login-input" style="margin: 0; padding: 6px 10px; font-size: 12px; font-weight: 800; width: auto;" onchange="window.recalcularConsolidadoPorFecha(this.value)"></select>
+                    </div>
+
+                    <div style="flex: 1; min-width: 180px;">
+                        <input type="text" id="input-filtrar-consolidado" class="login-input" style="margin: 0; padding: 6px 12px; font-size: 12px; width: 100%;" placeholder="🔍 Filtrar fármaco en la lista..." oninput="window.renderizarTablaConsolidado()">
+                    </div>
+                </div>
+
+                <!-- Tarjetas de resumen rápido -->
+                <div id="resumen-kpis-consolidado" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 12px;"></div>
+
+                <!-- Tabla de medicamentos consolidados -->
+                <div id="contenedor-tabla-consolidado" style="flex: 1; overflow-y: auto; max-height: 400px; margin-top: 12px; border: 1px solid var(--glass-border); border-radius: 12px; background: rgba(0,0,0,0.12);"></div>
+
+                <div class="modal-actions" style="margin-top: 15px; justify-content: space-between; gap: 12px;">
+                    <button type="button" class="btn-entendido" onclick="window.cerrarModalConsolidadoServicio()">CERRAR</button>
+                    <button type="button" class="btn-validar" style="background: linear-gradient(135deg, #7c4dff, #651fff); color: #fff; font-weight: 900; display: flex; align-items: center; gap: 8px; padding: 10px 22px;" onclick="window.imprimirConsolidadoServicio()">
+                        <span class="material-icons-round" style="font-size: 18px;">print</span>
+                        IMPRIMIR HOJA DE CARGO / REBAJA DE STOCK
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    // Poblar selector de servicios
+    const selSrv = document.getElementById("select-consolidado-servicio");
+    const listaServicios = (window.datosGlobales?.servicios?.length > 0) ? window.datosGlobales.servicios : window.LISTA_SERVICIOS_BASE;
+    selSrv.innerHTML = listaServicios.map(s => `<option value="${s.toUpperCase()}" ${s.toUpperCase() === servicioActivo ? "selected" : ""}>${s.toUpperCase()}</option>`).join("");
+
+    modal.style.display = "flex";
+    setTimeout(() => modal.classList.add("show"), 15);
+
+    // Asegurar que la cama actualmente abierta esté guardada antes de sumar todo el servicio
+    const srvActualDOM = document.getElementById("servicio")?.value;
+    const camaActualDOM = document.getElementById("cama")?.value;
+    if (srvActualDOM && camaActualDOM && window.hayCambiosSinGuardar) {
+        await window.ejecutarGuardadoSilencioso(srvActualDOM, camaActualDOM);
+    }
+
+    await window.cargarDatosConsolidadoServicio(servicioActivo);
+};
+
+window.cerrarModalConsolidadoServicio = function () {
+    const modal = document.getElementById("modal-consolidado-servicio");
+    if (!modal) return;
+    modal.classList.remove("show");
+    setTimeout(() => modal.style.display = "none", 250);
+};
+
+window.cargarDatosConsolidadoServicio = async function (servicioElegido) {
+    const contenedor = document.getElementById("contenedor-tabla-consolidado");
+    if (contenedor) {
+        contenedor.innerHTML = `
+            <div style="text-align: center; padding: 45px 20px; color: var(--text-muted); font-size: 13px;">
+                <span class="material-icons-round" style="font-size: 36px; color: var(--accent-blue); animation: spin 1.5s linear infinite; display: block; margin-bottom: 10px;">sync</span>
+                Escaneando todas las camas activas de <b>${servicioElegido}</b>...
+            </div>`;
+    }
+
+    try {
+        const snap = await getDocs(collection(window.db, "camas_activas"));
+        const camasDelServicio = [];
+
+        snap.forEach(docSnap => {
+            const d = docSnap.data();
+            if (d && (d.servicio || "").trim().toUpperCase() === servicioElegido.toUpperCase() && d.medicamentos && d.medicamentos.length > 0) {
+                camasDelServicio.push(d);
+            }
+        });
+
+        window.datosConsolidadoServicioActual.servicio = servicioElegido.toUpperCase();
+        window.datosConsolidadoServicioActual.camasRaw = camasDelServicio;
+
+        // Extraer todas las fechas únicas presentes en las cabeceras de este servicio
+        const setFechas = new Set();
+        const fechaHoyStr = window.formatearFechaCortaHoy().toLowerCase();
+
+        camasDelServicio.forEach(camaObj => {
+            (camaObj.fechasCabecera || []).forEach(f => {
+                if (f && f.trim() !== "") setFechas.add(f.trim().toLowerCase());
+            });
+        });
+
+        const fechasArray = Array.from(setFechas);
+        const selFecha = document.getElementById("select-consolidado-fecha");
+
+        if (fechasArray.length === 0) {
+            selFecha.innerHTML = `<option value="ULTIMO_DIA">Último día activo de cada cama</option>`;
+            window.recalcularConsolidadoPorFecha("ULTIMO_DIA");
+            return;
+        }
+
+        // Priorizar la fecha de hoy si existe; si no, la última fecha registrada
+        let fechaPorDefecto = fechasArray.includes(fechaHoyStr) ? fechaHoyStr : fechasArray[fechasArray.length - 1];
+
+        selFecha.innerHTML = `
+            ${fechasArray.map(f => `<option value="${f}" ${f === fechaPorDefecto ? "selected" : ""}>📅 Fecha: ${f.toUpperCase()}${f === fechaHoyStr ? " (HOY)" : ""}</option>`).join("")}
+            <option value="ULTIMO_DIA">⚡ Última columna activa de cada cama</option>
+        `;
+
+        window.recalcularConsolidadoPorFecha(fechaPorDefecto);
+    } catch (err) {
+        console.error("Error calculando consolidado:", err);
+        if (contenedor) {
+            contenedor.innerHTML = `<div style="text-align:center; padding:30px; color:var(--accent-red);">❌ Error al conectar con Firestore.</div>`;
+        }
+    }
+};
+
+window.recalcularConsolidadoPorFecha = function (criterioFecha) {
+    window.datosConsolidadoServicioActual.fechaSeleccionada = criterioFecha;
+    const camas = window.datosConsolidadoServicioActual.camasRaw || [];
+
+    const mapaConsolidado = {};
+    let totalPacientesConDespacho = 0;
+    let sumaTotalUnidadesGlobal = 0;
+
+    // Ordenar camas numéricamente (Cama 1, Cama 2, ... Cama 17)
+    camas.sort((a, b) => {
+        const numA = parseInt((a.cama || "").replace(/\D/g, "")) || 999;
+        const numB = parseInt((b.cama || "").replace(/\D/g, "")) || 999;
+        return numA - numB;
+    });
+
+    camas.forEach(camaObj => {
+        const cabeceras = (camaObj.fechasCabecera || []).map(f => (f || "").trim().toLowerCase());
+        let indicesAConsiderar = [];
+
+        if (criterioFecha === "ULTIMO_DIA") {
+            let ultIdx = -1;
+            cabeceras.forEach((f, idx) => { if (f !== "") ultIdx = idx; });
+            if (ultIdx === -1) ultIdx = 0;
+            indicesAConsiderar.push(ultIdx);
+        } else {
+            cabeceras.forEach((f, idx) => {
+                if (f === criterioFecha.toLowerCase()) indicesAConsiderar.push(idx);
+            });
+        }
+
+        if (indicesAConsiderar.length === 0) return;
+
+        let pacienteRecibioAlgo = false;
+
+        (camaObj.medicamentos || []).forEach(med => {
+            const nombreOriginal = (med.farmaco || "").trim();
+            if (!nombreOriginal) return;
+
+            let sumaMedEnEstaCama = 0;
+            indicesAConsiderar.forEach(colIdx => {
+                const rawVal = (med.dias && med.dias[colIdx] !== undefined) ? String(med.dias[colIdx]) : "";
+                // Limpiar check "✓" y espacios
+                const limpio = rawVal.replace("✓", "").trim().toUpperCase();
+
+                // Ignorar "T" (Tiene saldo), "S/I" (Sin indicación), "-" o vacío
+                if (!limpio || limpio === "T" || limpio === "S/I" || limpio === "-") return;
+
+                const numero = parseFloat(limpio.replace(",", "."));
+                if (!isNaN(numero) && numero > 0) {
+                    sumaMedEnEstaCama += numero;
+                }
+            });
+
+            if (sumaMedEnEstaCama > 0) {
+                pacienteRecibioAlgo = true;
+                sumaTotalUnidadesGlobal += sumaMedEnEstaCama;
+
+                const claveNorm = window.quitarTildes(nombreOriginal.toLowerCase());
+                if (!mapaConsolidado[claveNorm]) {
+                    mapaConsolidado[claveNorm] = {
+                        nombre: nombreOriginal,
+                        via: (med.via || "").toUpperCase(),
+                        totalUnidades: 0,
+                        detalleCamas: []
+                    };
+                }
+                mapaConsolidado[claveNorm].totalUnidades += sumaMedEnEstaCama;
+                mapaConsolidado[claveNorm].detalleCamas.push({
+                    cama: camaObj.cama || "S/C",
+                    paciente: camaObj.nombre || "Paciente",
+                    cantidad: sumaMedEnEstaCama
+                });
+            }
+        });
+
+        if (pacienteRecibioAlgo) totalPacientesConDespacho++;
+    });
+
+    const listaOrdenada = Object.values(mapaConsolidado).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+    window.datosConsolidadoServicioActual.itemsConsolidados = listaOrdenada;
+    window.datosConsolidadoServicioActual.totalPacientes = totalPacientesConDespacho;
+    window.datosConsolidadoServicioActual.sumaTotalUnidadesGlobal = sumaTotalUnidadesGlobal;
+
+    window.renderizarTablaConsolidado();
+};
+
+window.renderizarTablaConsolidado = function () {
+    const contenedor = document.getElementById("contenedor-tabla-consolidado");
+    const kpis = document.getElementById("resumen-kpis-consolidado");
+    const filtro = window.quitarTildes((document.getElementById("input-filtrar-consolidado")?.value || "").trim().toLowerCase());
+
+    const datos = window.datosConsolidadoServicioActual;
+    const items = (datos.itemsConsolidados || []).filter(item =>
+        !filtro || window.quitarTildes(item.nombre.toLowerCase()).includes(filtro)
+    );
+
+    if (kpis) {
+        kpis.innerHTML = `
+            <div style="background: rgba(64,196,255,0.08); border: 1px solid rgba(64,196,255,0.3); padding: 10px 15px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">Camas con Despacho</span>
+                <b style="font-size: 18px; color: var(--accent-blue);">${datos.totalPacientes || 0}</b>
+            </div>
+            <div style="background: rgba(124,77,255,0.1); border: 1px solid rgba(124,77,255,0.35); padding: 10px 15px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">Fármacos Distintos</span>
+                <b style="font-size: 18px; color: #b388ff;">${(datos.itemsConsolidados || []).length}</b>
+            </div>
+            <div style="background: rgba(0,230,118,0.08); border: 1px solid rgba(0,230,118,0.3); padding: 10px 15px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">Total Unidades a Rebajar</span>
+                <b style="font-size: 18px; color: var(--accent-green);">${datos.sumaTotalUnidadesGlobal || 0}</b>
+            </div>
+        `;
+    }
+
+    if (!contenedor) return;
+
+    if (items.length === 0) {
+        contenedor.innerHTML = `
+            <div style="text-align: center; padding: 45px 20px; color: var(--text-muted); font-size: 13px;">
+                <span class="material-icons-round" style="font-size: 40px; display: block; margin-bottom: 8px; opacity: 0.4;">inventory_2</span>
+                No se encontraron medicamentos con unidades numéricas despachadas para la fecha seleccionada.
+            </div>`;
+        return;
+    }
+
+    contenedor.innerHTML = `
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <thead>
+                <tr style="background: rgba(0,0,0,0.35); color: var(--accent-blue); text-transform: uppercase; font-size: 11px; position: sticky; top: 0; z-index: 5;">
+                    <th style="padding: 10px 15px; text-align: left; border-bottom: 1px solid var(--glass-border);">Medicamento (Arsenal)</th>
+                    <th style="padding: 10px; text-align: center; border-bottom: 1px solid var(--glass-border); width: 65px;">Vía</th>
+                    <th style="padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--glass-border);">Desglose por Cama</th>
+                    <th style="padding: 10px 18px; text-align: right; border-bottom: 1px solid var(--glass-border); width: 120px;">Total Entregado</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${items.map((item, idx) => {
+                    const badgesCamas = item.detalleCamas.map(d =>
+                        `<span style="display:inline-block; background:rgba(255,255,255,0.06); border:1px solid var(--glass-border); padding:2px 7px; border-radius:6px; font-size:11px; margin:2px;" title="${d.paciente}">${d.cama}: <b style="color:var(--accent-blue);">${d.cantidad}</b></span>`
+                    ).join(" ");
+
+                    return `
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); background: ${idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)'};">
+                            <td style="padding: 10px 15px; font-weight: 800; color: var(--text-main);">${item.nombre}</td>
+                            <td style="padding: 10px; text-align: center; font-weight: 700; color: var(--text-muted); font-size: 11px;">${item.via || "-"}</td>
+                            <td style="padding: 8px 12px;">${badgesCamas}</td>
+                            <td style="padding: 10px 18px; text-align: right; font-size: 16px; font-weight: 900; color: var(--accent-green);">${item.totalUnidades}</td>
+                        </tr>
+                    `;
+                }).join("")}
+            </tbody>
+        </table>
+    `;
+};
+
+window.imprimirConsolidadoServicio = function () {
+    const datos = window.datosConsolidadoServicioActual;
+    if (!datos.itemsConsolidados || datos.itemsConsolidados.length === 0) {
+        alert("⚠️ No hay medicamentos consolidados para imprimir en esta fecha.");
+        return;
+    }
+
+    const fechaImpresion = new Date().toLocaleDateString('es-CL');
+    const horaImpresion = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+    const usuario = JSON.parse(sessionStorage.getItem("FarmaPerfil_Sesion") || "{}");
+    const etiquetaFecha = datos.fechaSeleccionada === "ULTIMO_DIA" ? "Último Día Activo" : datos.fechaSeleccionada.toUpperCase();
+
+    const filasHTML = datos.itemsConsolidados.map((item, idx) => {
+        const resumenCamas = item.detalleCamas.map(d => `${d.cama.replace(/Cama\s*/i, 'C')}(${d.cantidad})`).join(", ");
+        return `
+            <tr>
+                <td style="text-align: center; font-weight: 700; color: #555;">${idx + 1}</td>
+                <td style="font-weight: 800; font-size: 12.5px;">${item.nombre}</td>
+                <td style="text-align: center; font-weight: 700; font-size: 11px;">${item.via || "-"}</td>
+                <td style="font-size: 10.5px; color: #333;">${resumenCamas}</td>
+                <td style="text-align: center; font-size: 15px; font-weight: 900;">${item.totalUnidades}</td>
+                <td style="text-align: center;"><div style="width: 14px; height: 14px; border: 1.5px solid #000; margin: 0 auto; border-radius: 3px;"></div></td>
+            </tr>
+        `;
+    }).join("");
+
+    const html = `
+        <html>
+        <head>
+            <title>Consolidado ${datos.servicio} - ${etiquetaFecha}</title>
+            <style>
+                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+                body { font-family: 'Inter', sans-serif; padding: 15px; color: #000; margin: 0; }
+                .header-box { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 12px; }
+                .header-box h1 { margin: 0; font-size: 18px; font-weight: 900; text-transform: uppercase; }
+                .header-box p { margin: 3px 0 0 0; font-size: 11px; color: #333; font-weight: 600; }
+                .meta-bar { display: flex; justify-content: space-between; background: #f2f2f7; border: 1px solid #000; padding: 8px 12px; border-radius: 6px; font-size: 11.5px; font-weight: 700; margin-bottom: 12px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                table { width: 100%; border-collapse: collapse; }
+                th, td { border: 1px solid #000; padding: 6px 8px; }
+                th { background: #e5e5ea; font-size: 10.5px; text-transform: uppercase; font-weight: 900; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                tr { page-break-inside: avoid; }
+                @media print {
+                    @page { margin: 10mm; size: letter portrait; }
+                    body { padding: 0; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header-box">
+                <div>
+                    <h1>Planilla de Cargo y Rebaja de Stock por Servicio</h1>
+                    <p>Farmacia Hospitalaria · Hospital El Pino · Generado el ${fechaImpresion} a las ${horaImpresion}</p>
+                </div>
+                <div style="text-align: right; font-size: 11px;">
+                    <b>Responsable:</b> ${usuario.nombre || "Farmacia"}<br>
+                    <b>Rol:</b> ${usuario.rol || "Clínico"}
+                </div>
+            </div>
+
+            <div class="meta-bar">
+                <span>🏥 SERVICIO: ${datos.servicio}</span>
+                <span>📅 FECHA DESPACHO: ${etiquetaFecha}</span>
+                <span>🛏️ CAMAS CON DESPACHO: ${datos.totalPacientes}</span>
+                <span>💊 TOTAL ÍTEMS: ${datos.itemsConsolidados.length} (${datos.sumaTotalUnidadesGlobal} uds.)</span>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 30px;">N°</th>
+                        <th style="text-align: left;">Medicamento Entregado</th>
+                        <th style="width: 45px;">Vía</th>
+                        <th style="text-align: left; width: 34%;">Detalle por Cama (Unidades)</th>
+                        <th style="width: 85px;">Total Servicio</th>
+                        <th style="width: 55px;">Digitado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${filasHTML}
+                </tbody>
+            </table>
+        </body>
+        </html>
+    `;
+
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+    setTimeout(() => { win.print(); }, 300);
+};

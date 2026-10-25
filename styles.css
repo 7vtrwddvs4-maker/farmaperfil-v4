@@ -1108,6 +1108,11 @@ body.light-theme .input-nuevo-concil {
    MODO IMPRESIÓN DE PLANTILLA EN BLANCO (PARA ESCRITURA A MANO)
    ========================================================= */
 @media print {
+    /* Ocultar el overlay de login si se imprime directo desde la portada sin iniciar sesión */
+    body.modo-plantilla-blanca #loginOverlay,
+    #loginOverlay {
+        display: none !important;
+    }
     /* 1. Ocultar Servicio ("Medicina"), Cama ("Cama 1"), Fecha ("dd/mm/aaaa") y todos los datos del paciente o fármacos */
     body.modo-plantilla-blanca .patient-grid input,
     body.modo-plantilla-blanca .patient-grid select,
