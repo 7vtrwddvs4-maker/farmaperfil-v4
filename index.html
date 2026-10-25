@@ -533,8 +533,11 @@
             </div>
         </div>
 
-        <div class="btn-imprimir-container">
-            <button class="btn-imprimir" id="btnImprimirAccion" onclick="imprimirSeguro()">
+        <div class="btn-imprimir-container" style="display: flex; justify-content: flex-end; gap: 12px;">
+            <button type="button" class="btn-imprimir" style="background: rgba(64, 196, 255, 0.12); color: var(--accent-blue); border: 1px dashed var(--accent-blue); box-shadow: none;" onclick="window.imprimirPlantillaBlanco()" title="Imprimir formato vacío para llenado manual">
+                <span class="material-icons-round">description</span> Imprimir Plantilla en Blanco
+            </button>
+            <button type="button" class="btn-imprimir" id="btnImprimirAccion" onclick="imprimirSeguro()">
                 <span class="material-icons-round">print</span> Imprimir Hoja de Trabajo
             </button>
         </div>

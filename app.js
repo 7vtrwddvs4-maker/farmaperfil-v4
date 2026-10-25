@@ -3427,6 +3427,22 @@ window.imprimirSeguro = function () {
     window.print();
 };
 
+window.imprimirPlantillaBlanco = function () {
+    if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT')) {
+        document.activeElement.blur();
+    }
+
+    // Activar máscara que oculta Servicio, Cama, Fecha dd/mm/aaaa y cualquier dato escrito en pantalla
+    document.body.classList.add("modo-plantilla-blanca");
+
+    window.print();
+
+    // Restaurar la vista normal apenas se cierra la ventana de impresión
+    setTimeout(() => {
+        document.body.classList.remove("modo-plantilla-blanca");
+    }, 500);
+};
+
 window.cambiarTabSidebar = function (pestana) {
     const tabSaldos = document.getElementById("tab-saldos");
     const tabTransito = document.getElementById("tab-transito");

@@ -1103,3 +1103,42 @@ body.light-theme .input-nuevo-concil {
         display: none !important;
     }
 }
+
+/* =========================================================
+   MODO IMPRESIÓN DE PLANTILLA EN BLANCO (PARA ESCRITURA A MANO)
+   ========================================================= */
+@media print {
+    /* 1. Ocultar Servicio ("Medicina"), Cama ("Cama 1"), Fecha ("dd/mm/aaaa") y todos los datos del paciente o fármacos */
+    body.modo-plantilla-blanca .patient-grid input,
+    body.modo-plantilla-blanca .patient-grid select,
+    body.modo-plantilla-blanca #alergiaPaciente,
+    body.modo-plantilla-blanca .med-grid tbody input,
+    body.modo-plantilla-blanca .header-fecha {
+        color: transparent !important;
+        -webkit-text-fill-color: transparent !important;
+    }
+
+    /* 2. Ocultar específicamente la máscara nativa "dd/mm/aaaa" o "dd-mm-aaaa" del input type="date" en Safari y Chrome */
+    body.modo-plantilla-blanca input[type="date"]::-webkit-datetime-edit,
+    body.modo-plantilla-blanca input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+    body.modo-plantilla-blanca input[type="date"]::-webkit-datetime-edit-text,
+    body.modo-plantilla-blanca input[type="date"]::-webkit-datetime-edit-day-field,
+    body.modo-plantilla-blanca input[type="date"]::-webkit-datetime-edit-month-field,
+    body.modo-plantilla-blanca input[type="date"]::-webkit-datetime-edit-year-field {
+        color: transparent !important;
+        -webkit-text-fill-color: transparent !important;
+        opacity: 0 !important;
+    }
+
+    /* 3. Ocultar placeholders y tildes de casillas si estás imprimiendo la plantilla desde una cama ocupada */
+    body.modo-plantilla-blanca input::placeholder {
+        color: transparent !important;
+        -webkit-text-fill-color: transparent !important;
+    }
+
+    body.modo-plantilla-blanca .btn-check.ticked::after,
+    body.modo-plantilla-blanca .btn-check .material-icons-round,
+    body.modo-plantilla-blanca .mensaje-reaccion {
+        display: none !important;
+    }
+}
