@@ -1147,3 +1147,47 @@ body.light-theme .input-nuevo-concil {
         display: none !important;
     }
 }
+/* =========================================================
+   ESTABILIZADOR DE GPU (ANTI-PARPADEO AL HACER SCROLL EN MODALES)
+   ========================================================= */
+@media screen {
+    /* 1. Fijar el overlay y el contenedor en su propia capa de GPU para no recalcular el blur de fondo */
+    .modal-overlay,
+    .modal-container {
+        -webkit-transform: translateZ(0);
+        transform: translateZ(0);
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
+    }
+
+    /* 2. Desactivar el doble backdrop-filter interno dentro de los modales que ya tienen overlay con blur */
+    .modal-overlay .modal-container {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        background: var(--panel-bg) !important;
+    }
+
+    /* 3. Aislar el repintado (contain: paint) en las listas con scroll de Conciliación, Consolidado, Visación y Censo */
+    #lista-farmacos-conciliacion,
+    #contenedor-tabla-consolidado,
+    #contenedor-items-visacion,
+    #lista-censo-pacientes,
+    #lista-egresos-recientes {
+        will-change: scroll-position;
+        -webkit-overflow-scrolling: touch;
+        -webkit-transform: translate3d(0, 0, 0);
+        transform: translate3d(0, 0, 0);
+        contain: layout paint;
+        overscroll-behavior: contain;
+    }
+
+    /* 4. Evitar que la cabecera sticky del Consolidado use transparencia que fuerce repintado al bajar */
+    #contenedor-tabla-consolidado thead tr {
+        background: #14242d !important;
+        -webkit-transform: translateZ(0);
+        transform: translateZ(0);
+    }
+    body.light-theme #contenedor-tabla-consolidado thead tr {
+        background: #dce8f3 !important;
+    }
+}

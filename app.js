@@ -39,7 +39,7 @@ const PROTOCOLOS_RESTRINGIDOS = {
     "valsartan": { especialidad: "Cardiología", medicos: ["Dr. Escobar", "Dr. Garibaldi", "Dr. Palma"] },
     "vildagliptina": { especialidad: "Cardiología / Diabetología", medicos: ["Dr. Escobar", "Dr. Garibaldi", "Dr. Palma", "Dr. Sanhueza"] },
     "linagliptina": { especialidad: "Diabetología", medicos: ["Dr. Sanhueza"] },
-    // Psiquiatría
+    // Psiquiatría (Risperidona y Sertralina liberadas; Olanzapina solo restringida si > 10 mg/día)
     "bupropion": { especialidad: "Psiquiatría", medicos: ["Equipo Psiquiatría"] },
     "aripiprazol": { especialidad: "Psiquiatría", medicos: ["Equipo Psiquiatría"] },
     "litio": { especialidad: "Psiquiatría", medicos: ["Equipo Psiquiatría"] },
@@ -51,13 +51,12 @@ const PROTOCOLOS_RESTRINGIDOS = {
     "flupentixol": { especialidad: "Psiquiatría", medicos: ["Equipo Psiquiatría"] },
     "lamotrigina": { especialidad: "Psiquiatría", medicos: ["Equipo Psiquiatría"] },
     "mirtazapina": { especialidad: "Psiquiatría", medicos: ["Equipo Psiquiatría"] },
-    "olanzapina": { especialidad: "Psiquiatría", medicos: ["Equipo Psiquiatría"] },
+    "olanzapina": { especialidad: "Psiquiatría (Dosis > 10 mg/día)", medicos: ["Equipo Psiquiatría"] },
     "zuclopentixol": { especialidad: "Psiquiatría", medicos: ["Equipo Psiquiatría"] },
     "paroxetina": { especialidad: "Psiquiatría", medicos: ["Equipo Psiquiatría"] },
     "trihexifenidilo": { especialidad: "Psiquiatría", medicos: ["Equipo Psiquiatría"] },
     "venlafaxina": { especialidad: "Psiquiatría", medicos: ["Equipo Psiquiatría"] },
     "trazodona": { especialidad: "Psiquiatría", medicos: ["Equipo Psiquiatría"] },
-    "risperidona": { especialidad: "Psiquiatría", medicos: ["Equipo Psiquiatría"] },
     // Dermatología
     "mometasona": { especialidad: "Dermatología", medicos: ["Equipo Dermatología"] },
     "clobetasol": { especialidad: "Dermatología", medicos: ["Equipo Dermatología"] },
@@ -1428,10 +1427,15 @@ window.calcularDosisFila = function (medTexto, viaTexto, dosisTexto, posoTexto, 
     // Bloqueo por protocolo restringido no autorizado
     if (rowId !== null) {
         let keyEncontrada = Object.keys(PROTOCOLOS_RESTRINGIDOS).find(k => medTexto.includes(k));
+        if (keyEncontrada === "olanzapina") {
+            const dNum = window.extraerSoloNumero(dosisTexto);
+            const fNum = window.obtenerFactorFrecuenciaFront(posoTexto);
+            if ((dNum * fNum) <= 10) keyEncontrada = null; // Liberada si es <= 10 mg/día
+        }
         if (keyEncontrada) {
             const prot = PROTOCOLOS_RESTRINGIDOS[keyEncontrada];
             const srv = (document.getElementById("servicio").value || "").toLowerCase();
-            if (!(prot.especialidad === "Psiquiatría" && srv === "uce")) {
+            if (!(prot.especialidad.includes("Psiquiatría") && srv === "uce")) {
                 const estado = window.medicamentosPendientes[`${rowId}|${medTexto}`]?.estado;
                 if (estado && estado !== "ACEPTADO") return "";
             }
@@ -1924,19 +1928,14 @@ window.abrirModalConciliacionDia = function (colIndex, fechaFormateada) {
         const isJarabe = Object.keys(DB_LIQUIDOS).some(k => medLimpio.includes(window.quitarTildes(k.toLowerCase())));
         const esEspecial = diccEspeciales.some(m => nombreMed.includes(m)) || isJarabe;
 
-        // 1. Verificar Albúmina > 3 días en UPC
+        // 1. Verificar Albúmina según nuevo protocolo transversal (Dosis Máxima vs Días, lo que se cumpla primero)
         const esAlbumina = nombreMed.includes("albumina") || nombreMed.includes("albúmina");
-        if (esAlbumina && esUciUti) {
-            let diasConAlbumina = 0;
-            for (let d = 0; d < colIndex; d++) {
-                if (inputs[5 + d].value.trim() !== "") diasConAlbumina++;
-            }
-            const firmaAlbumina = `${rowId}|${nombreMed}`;
-            const estadoAlm = window.medicamentosPendientes[firmaAlbumina]?.estado;
-            if (diasConAlbumina >= 3 && estadoAlm !== "ACEPTADO") {
+        if (esAlbumina && typeof window.evaluarEstadoProtocoloAlbumina === "function") {
+            const evalAlb = window.evaluarEstadoProtocoloAlbumina(fila);
+            if (!evalAlb.cumple) {
                 sugerenciaHoy = "";
                 iniciarOmitido = true;
-                notaClinica = "⚠️ Límite UPC 3 días (Requiere extensión)";
+                notaClinica = `⚠️ ${evalAlb.etiquetaBoton} (Revisar protocolo)`;
             }
         }
 
@@ -2593,19 +2592,21 @@ window.escanearRestringidos = function () {
         let tipoRestriccion = "ESTANDAR";
         const firmaRestringido = `${rowId}|${nombreMed}`;
 
+        const dosisTextoFila = inputs[2].value.trim();
         let keyEncontrada = Object.keys(PROTOCOLOS_RESTRINGIDOS).find(k => nombreMed.includes(k));
-        if (keyEncontrada) {
-            if (!(PROTOCOLOS_RESTRINGIDOS[keyEncontrada].especialidad === "Psiquiatría" && servicioActual === "uce")) {
-                protocolo = PROTOCOLOS_RESTRINGIDOS[keyEncontrada];
+
+        // Regla especial Olanzapina: liberada si la dosis diaria total es <= 10 mg/día
+        if (keyEncontrada === "olanzapina") {
+            const dNum = window.extraerSoloNumero(dosisTextoFila);
+            const fNum = window.obtenerFactorFrecuenciaFront(posoTexto);
+            if ((dNum * fNum) <= 10) {
+                keyEncontrada = null;
             }
         }
-        else if (esUciUti && (nombreMed.includes("albumina") || nombreMed.includes("albúmina"))) {
-            let diasPrescritos = 0;
-            for (let d = 0; d < 10; d++) { if (inputs[5 + d].value.trim() !== "") diasPrescritos++; }
-            let estaEnMemoria = window.medicamentosPendientes[firmaRestringido]?.tipo === "ALBUMINA";
-            if (diasPrescritos > 3 || estaEnMemoria) {
-                protocolo = { especialidad: "UPC (Extensión Día 4+)", medicos: ["Dra. Gil", "Dr. Moscoso", "Dr. Rodríguez"] };
-                tipoRestriccion = "ALBUMINA";
+
+        if (keyEncontrada) {
+            if (!(PROTOCOLOS_RESTRINGIDOS[keyEncontrada].especialidad.includes("Psiquiatría") && servicioActual === "uce")) {
+                protocolo = PROTOCOLOS_RESTRINGIDOS[keyEncontrada];
             }
         }
         else if (nombreMed.includes("pregabalina")) {
@@ -6799,4 +6800,614 @@ window.imprimirConsolidadoServicio = function () {
     win.document.write(html);
     win.document.close();
     setTimeout(() => { win.print(); }, 300);
+};
+
+// ============================================================================
+// 20. PROTOCOLO INSTITUCIONAL DE ALBÚMINA HUMANA 20% (DIAGNÓSTICO + SIDRA + LÍMITE DUAL)
+// ============================================================================
+window.autorizacionesPorFila = window.autorizacionesPorFila || {};
+
+window.CATALOGO_PROTOCOLO_ALBUMina = {
+    "PARACENTESIS": {
+        id: "PARACENTESIS",
+        nombre: "Paracentesis de gran volumen (>5 L)",
+        dosisDia: "6-8 g por cada litro de ascitis evacuado (Dosis habitual 30-60 g)",
+        maxGramos: 100,
+        maxFrascos: 10,
+        maxDias: 1,
+        textoDuracion: "N/A (1 procedimiento)",
+        consideraciones: "No requiere dosis repetidas salvo nuevo procedimiento."
+    },
+    "PBE": {
+        id: "PBE",
+        nombre: "Peritonitis bacteriana espontánea (PBE)",
+        dosisDia: "Día 1: 1,5 g/kg (máx. 100 g) | Día 3: 1 g/kg (máx. 100 g)",
+        maxGramos: 200,
+        maxFrascos: 20,
+        maxDias: 3,
+        textoDuracion: "3 días (Dosis en día 1 y luego día 3)",
+        consideraciones: "Administrar junto con antibióticos."
+    },
+    "SHR_AKI": {
+        id: "SHR_AKI",
+        nombre: "Síndrome hepatorrenal (SHR-AKI)",
+        dosisDia: "Día 1-2: 1 g/kg/día (máx. 100 g/día) | Día 3 a mayor: 25-50 g/día",
+        maxGramos: 450,
+        maxFrascos: 45,
+        maxDias: 10,
+        textoDuracion: "10 días",
+        consideraciones: "Asociar a terlipresina. Suspender si no responde tras 7 días o presenta sobrecarga de volumen."
+    },
+    "SHOCK_SEPTICO": {
+        id: "SHOCK_SEPTICO",
+        nombre: "Shock séptico",
+        dosisDia: "60 g / 24 horas",
+        maxGramos: 180,
+        maxFrascos: 18,
+        maxDias: 3,
+        textoDuracion: "3 días",
+        consideraciones: "Segunda línea. No constituye cristaloides. Sin beneficio demostrado sobre mortalidad."
+    },
+    "HIPOTENSION_INTRADIALITICA": {
+        id: "HIPOTENSION_INTRADIALITICA",
+        nombre: "Hipotensión intradialítica",
+        dosisDia: "20-30 g / sesión",
+        maxGramos: 30,
+        maxFrascos: 3,
+        maxDias: 1,
+        textoDuracion: "N/A (Por sesión)",
+        consideraciones: "Reservar para pacientes refractarios a solución salina."
+    },
+    "EDEMA_REFRACTARIO": {
+        id: "EDEMA_REFRACTARIO",
+        nombre: "Edema severo y refractario con hipoalbuminemia",
+        dosisDia: "20-60 g/día (10-20 g junto a diurético)",
+        maxGramos: 120,
+        maxFrascos: 12,
+        maxDias: 2,
+        textoDuracion: "2 días",
+        consideraciones: "Solo si albúmina < 2,5 g/dL, y refractaria a diuréticos. Suspender cuando albúmina > 2,5 g/dL o mejore el edema."
+    },
+    "GRAN_QUEMADO": {
+        id: "GRAN_QUEMADO",
+        nombre: "Gran quemado (>20% SCT) y Necrosis Epidérmica Tóxica",
+        dosisDia: "10-20 g cada 20 minutos",
+        maxGramos: null,
+        maxFrascos: null,
+        maxDias: null,
+        textoDuracion: "Según evolución",
+        consideraciones: "Utilizar como complemento de cristaloides cuando éstas sean insuficientes o exista hipoalbuminemia severa < 2,5 g/dL."
+    },
+    "OTRO": {
+        id: "OTRO",
+        nombre: "Otro diagnóstico (Fuera de protocolo - Escritura libre)",
+        dosisDia: "Según indicación médica (Fuera de guía estándar)",
+        maxGramos: null,
+        maxFrascos: null,
+        maxDias: null,
+        textoDuracion: "Sujeto a autorización por Jefe de Servicio",
+        consideraciones: "Indicación fuera de protocolo estándar. Requiere justificación clínica, receta SIDRA y autorización por Jefe de Servicio."
+    }
+};
+
+// 1. Base de datos de Médicos auto-aprendible sincronizada con window.medicosData
+window.cargarMedicosPersonalizadosFirestore = async function () {
+    if (!window.db) return;
+    try {
+        const snap = await getDocs(collection(window.db, "medicos_personalizados"));
+        if (!Array.isArray(window.medicosData)) window.medicosData = [];
+
+        snap.forEach(docSnap => {
+            const m = docSnap.data();
+            if (m && m.nombre) {
+                const yaExiste = window.medicosData.some(
+                    x => window.quitarTildes((x.nombre || "").toLowerCase()) === window.quitarTildes(m.nombre.toLowerCase())
+                );
+                if (!yaExiste) {
+                    window.medicosData.push({ nombre: m.nombre.toUpperCase(), rut: m.rut || "S/R" });
+                }
+            }
+        });
+        window.refrescarDatalistMedicosDOM();
+    } catch (e) {
+        console.warn("Aviso al cargar médicos personalizados:", e);
+    }
+};
+
+window.refrescarDatalistMedicosDOM = function () {
+    const dl = document.getElementById("medicosList");
+    if (!dl || !Array.isArray(window.medicosData)) return;
+    dl.innerHTML = window.medicosData
+        .map(m => `<option value="${m.nombre}">${m.rut || ""}</option>`)
+        .join("");
+};
+
+window.guardarMedicoNuevoSiNoExiste = async function (nombreRaw, rutRaw) {
+    const nombreLimpio = (nombreRaw || "").trim().toUpperCase();
+    const rutLimpio = (rutRaw || "").trim().toUpperCase() || "S/R";
+    if (!nombreLimpio) return;
+
+    if (!Array.isArray(window.medicosData)) window.medicosData = [];
+
+    const idxExistente = window.medicosData.findIndex(
+        m => window.quitarTildes((m.nombre || "").toLowerCase()) === window.quitarTildes(nombreLimpio.toLowerCase())
+    );
+
+    if (idxExistente === -1) {
+        window.medicosData.push({ nombre: nombreLimpio, rut: rutLimpio });
+        window.refrescarDatalistMedicosDOM();
+        if (window.db) {
+            try {
+                const idDoc = nombreLimpio.replace(/[^A-Z0-9]/g, "_").substring(0, 50);
+                await setDoc(doc(window.db, "medicos_personalizados", idDoc), {
+                    nombre: nombreLimpio,
+                    rut: rutLimpio,
+                    actualizado: new Date().toISOString()
+                }, { merge: true });
+            } catch (e) {
+                console.warn("No se pudo guardar el nuevo médico en Firestore:", e);
+            }
+        }
+    } else if (rutLimpio !== "S/R" && (!window.medicosData[idxExistente].rut || window.medicosData[idxExistente].rut === "S/R")) {
+        window.medicosData[idxExistente].rut = rutLimpio;
+        window.refrescarDatalistMedicosDOM();
+    }
+};
+
+window.configurarAutocompletadoBidireccionalMedico = function () {
+    const inpNombre = document.getElementById("modal-medNombre");
+    const inpRut = document.getElementById("modal-medRut");
+    if (!inpNombre || !inpRut || inpRut.dataset.bidireccional === "true") return;
+
+    inpRut.dataset.bidireccional = "true";
+    inpRut.addEventListener("input", function () {
+        const valRut = inpRut.value.trim().toLowerCase().replace(/\./g, "");
+        if (valRut.length < 4 || !Array.isArray(window.medicosData)) return;
+        const encontrado = window.medicosData.find(
+            m => (m.rut || "").toLowerCase().replace(/\./g, "") === valRut
+        );
+        if (encontrado && !inpNombre.value.trim()) {
+            inpNombre.value = encontrado.nombre;
+        }
+    });
+};
+
+setTimeout(() => {
+    window.cargarMedicosPersonalizadosFirestore();
+    window.configurarAutocompletadoBidireccionalMedico();
+}, 1800);
+
+// 2. Cálculo exacto de Frascos, Gramos (1 frasco = 10 g) y Días de Albúmina en la fila
+window.calcularMetricasAlbuminaFila = function (fila) {
+    const inputs = fila.querySelectorAll("input");
+    let totalFrascos = 0;
+    let diasActivos = 0;
+
+    for (let d = 5; d < inputs.length; d++) {
+        const raw = (inputs[d].value || "").replace("✓", "").trim().toUpperCase();
+        if (!raw || raw === "S/I" || raw === "-") continue;
+
+        if (raw === "T") {
+            diasActivos++;
+        } else {
+            const num = parseFloat(raw.replace(",", "."));
+            if (!isNaN(num) && num > 0) {
+                totalFrascos += num;
+                diasActivos++;
+            }
+        }
+    }
+
+    // Si aún no hay celdas de días llenas pero ya escribieron dosis y posología, estimar primer día
+    if (totalFrascos === 0) {
+        const medTxt = inputs[0]?.value || "";
+        const viaTxt = inputs[1]?.value || "";
+        const dosTxt = inputs[2]?.value || "";
+        const posTxt = inputs[3]?.value || "";
+        const est = parseFloat(window.calcularDosisFila(medTxt, viaTxt, dosTxt, posTxt, 1, null)) || 0;
+        if (est > 0) {
+            totalFrascos = est;
+            diasActivos = 1;
+        }
+    }
+
+    return {
+        frascos: totalFrascos,
+        gramos: totalFrascos * 10,
+        dias: Math.max(1, diasActivos)
+    };
+};
+
+// 3. Evaluador de cumplimiento del protocolo de Albúmina ("Lo que ocurra primero": Dosis Máxima vs Días)
+window.evaluarEstadoProtocoloAlbumina = function (fila) {
+    window.autorizacionesPorFila = window.autorizacionesPorFila || {};
+    const rowId = fila.dataset.row;
+    const metricas = window.calcularMetricasAlbuminaFila(fila);
+    const nombreMed = (fila.querySelectorAll("input")[0]?.value || "").trim().toLowerCase();
+    const firmaAlb = `${rowId}|${nombreMed}`;
+
+    // Rescatar datos desde autorizacionesPorFila o desde medicamentosPendientes (persistencia en Firestore)
+    let reg = window.autorizacionesPorFila[rowId] || window.medicamentosPendientes?.[firmaAlb];
+
+    if (!reg || !reg.esProtocoloAlbumina || !reg.diagnosticoId) {
+        return {
+            cumple: false,
+            codigo: "SIN_PROTOCOLO",
+            etiquetaBoton: "⚠️ REQ. DIAG/SIDRA",
+            motivo: "El despacho de Albúmina Humana 20% requiere seleccionar un Diagnóstico del protocolo institucional y registrar el estado de la Receta SIDRA.",
+            metricas
+        };
+    }
+
+    const proto = window.CATALOGO_PROTOCOLO_ALBUMina[reg.diagnosticoId] || window.CATALOGO_PROTOCOLO_ALBUMina["OTRO"];
+    const nombreDiagMostrar = reg.diagnosticoId === "OTRO" ? (reg.diagnosticoOtroTexto || "Otro diagnóstico") : proto.nombre;
+
+    if (reg.recetaSidra !== "SI") {
+        const estadoRecetaTxt = reg.recetaSidra === "PENDIENTE" ? "⏳ RECETA PEND." : "❌ SIN RECETA";
+        return {
+            cumple: false,
+            codigo: "FALTA_RECETA",
+            etiquetaBoton: estadoRecetaTxt,
+            motivo: `Diagnóstico: ${nombreDiagMostrar}. El protocolo exige Receta SIDRA activa (Estado actual: ${reg.recetaSidra || "NO"}).`,
+            metricas,
+            proto
+        };
+    }
+
+    const excedeGramos = proto.maxGramos !== null && metricas.gramos > proto.maxGramos;
+    const excedeDias = proto.maxDias !== null && metricas.dias > proto.maxDias;
+
+    if (excedeGramos || excedeDias) {
+        if (reg.extensionJefeAutorizada && metricas.gramos <= (reg.gramosAutorizadosExtension || 0) && metricas.dias <= (reg.diasAutorizadosExtension || 0)) {
+            return {
+                cumple: true,
+                codigo: "EXTENSION_OK",
+                etiquetaBoton: "✅ EXT. AUTORIZADA",
+                motivo: `Extensión autorizada por Jefe de Servicio (${reg.medico || reg.medicoAutorizador || "Médico"}).`,
+                metricas,
+                proto
+            };
+        }
+
+        let detalleExceso = [];
+        if (excedeGramos) {
+            detalleExceso.push(`Dosis acumulada de ${metricas.gramos} g (${metricas.frascos} frascos) supera el máximo de ${proto.maxGramos} g (${proto.maxFrascos} frascos)`);
+        }
+        if (excedeDias) {
+            detalleExceso.push(`Duración actual de ${metricas.dias} días supera el tope de ${proto.maxDias} día(s)`);
+        }
+
+        return {
+            cumple: false,
+            codigo: "LIMITE_ALCANZADO",
+            etiquetaBoton: "⚠️ LÍMITE ALBÚMINA",
+            motivo: `⚠️ LÍMITE ALCANZADO (${nombreDiagMostrar}): ${detalleExceso.join(" y ")}. Según guía farmacoterapéutica (lo que ocurra primero), todo requerimiento adicional exige autorización por Jefe de Servicio.`,
+            metricas,
+            proto
+        };
+    }
+
+    return {
+        cumple: true,
+        codigo: "OK",
+        etiquetaBoton: "✅ ALBÚMINA OK",
+        motivo: `Protocolo activo: ${nombreDiagMostrar} (${metricas.gramos}/${proto.maxGramos || "∞"} g · Día ${metricas.dias}/${proto.maxDias || "∞"} · Receta SIDRA: SÍ).`,
+        metricas,
+        proto
+    };
+};
+
+// 4. Inyección de la Interfaz Clínica de Albúmina dentro del Modal de Seguridad
+window.renderizarPanelModalAlbumina = function (fila) {
+    const cajaMensaje = document.getElementById("modal-mensaje");
+    if (!cajaMensaje) return;
+
+    window.autorizacionesPorFila = window.autorizacionesPorFila || {};
+    const rowId = fila.dataset.row;
+    const nombreMed = (fila.querySelectorAll("input")[0]?.value || "").trim().toLowerCase();
+    const firmaAlb = `${rowId}|${nombreMed}`;
+    const regPrevio = window.autorizacionesPorFila[rowId] || window.medicamentosPendientes?.[firmaAlb] || {};
+    const estado = window.evaluarEstadoProtocoloAlbumina(fila);
+    const diagInicial = regPrevio.diagnosticoId || "SHOCK_SEPTICO";
+    const recetaInicial = regPrevio.recetaSidra || "SI";
+    const otroTextoInicial = regPrevio.diagnosticoOtroTexto || "";
+
+    const opcionesSelect = Object.values(window.CATALOGO_PROTOCOLO_ALBUMina).map(p =>
+        `<option value="${p.id}" ${p.id === diagInicial ? "selected" : ""}>${p.nombre}</option>`
+    ).join("");
+
+    cajaMensaje.innerHTML = `
+        <div style="text-align: left; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.12); padding-bottom: 8px;">
+                <div>
+                    <span style="font-size: 11px; font-weight: 900; color: #ff9800; text-transform: uppercase;">Guía Farmacoterapéutica · Todos los Servicios</span>
+                    <div style="font-size: 14px; font-weight: 900; color: var(--text-main);">ALBÚMINA HUMANA 20% (10 g / 50 mL)</div>
+                </div>
+                <div style="background: rgba(64,196,255,0.12); border: 1px solid var(--accent-blue); padding: 5px 10px; border-radius: 8px; font-size: 11.5px; font-weight: 800; color: var(--accent-blue);">
+                    Acumulado Paciente: <b>${estado.metricas.gramos} g</b> (${estado.metricas.frascos} fcos) · <b>Día ${estado.metricas.dias}</b>
+                </div>
+            </div>
+
+            ${estado.codigo === "LIMITE_ALCANZADO" ? `
+                <div style="background: rgba(255, 82, 82, 0.16); border: 1.5px solid var(--accent-red); color: #ff8a80; padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 800;">
+                    ${estado.motivo}
+                </div>
+            ` : ""}
+
+            <div>
+                <label style="font-size: 11px; font-weight: 800; color: var(--accent-blue); text-transform: uppercase; display: block; margin-bottom: 4px;">
+                    1. Seleccione Diagnóstico de Indicación (Protocolo Hospital):
+                </label>
+                <select id="alb-select-diagnostico" class="login-input" style="margin: 0; width: 100%; padding: 8px 10px; font-weight: 800; font-size: 12.5px; cursor: pointer;" onchange="window.actualizarFichaInformativaAlbumina()">
+                    ${opcionesSelect}
+                </select>
+                <input type="text" id="alb-input-otro-diag" class="login-input" placeholder="Especifique el diagnóstico fuera de protocolo..." value="${otroTextoInicial}" style="margin-top: 6px; width: 100%; padding: 7px 10px; font-size: 12px; display: ${diagInicial === 'OTRO' ? 'block' : 'none'};">
+            </div>
+
+            <div id="alb-ficha-tecnica" style="background: rgba(0,0,0,0.28); border: 1px solid var(--glass-border); border-radius: 10px; padding: 10px 12px; font-size: 12px;"></div>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; background: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: 10px; border: 1px solid var(--glass-border);">
+                <span style="font-size: 11.5px; font-weight: 800; color: var(--text-main); text-transform: uppercase;">
+                    2. ¿Cuenta con Receta SIDRA?:
+                </span>
+                <div style="display: flex; gap: 8px;">
+                    <label style="cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 6px; background: rgba(0,230,118,0.12); border: 1px solid var(--accent-green); color: var(--accent-green);">
+                        <input type="radio" name="albRecetaSidra" value="SI" ${recetaInicial === "SI" ? "checked" : ""}> SÍ
+                    </label>
+                    <label style="cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 6px; background: rgba(255,171,0,0.12); border: 1px solid #ff9800; color: #ff9800;">
+                        <input type="radio" name="albRecetaSidra" value="PENDIENTE" ${recetaInicial === "PENDIENTE" ? "checked" : ""}> PENDIENTE
+                    </label>
+                    <label style="cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 6px; background: rgba(255,82,82,0.12); border: 1px solid var(--accent-red); color: var(--accent-red);">
+                        <input type="radio" name="albRecetaSidra" value="NO" ${recetaInicial === "NO" ? "checked" : ""}> NO
+                    </label>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Asegurar que el panel del médico esté visible y con su datalist actualizado
+    const panelDoctor = document.querySelector(".modal-doctor-panel");
+    if (panelDoctor) {
+        panelDoctor.innerHTML = `
+            <label>3. Médico Prescriptor / Autorizador (Se guarda automáticamente si es nuevo)</label>
+            <div class="modal-row-inputs">
+                <input type="text" id="modal-medNombre" list="medicosList" placeholder="Escriba o seleccione nombre del médico..." onchange="window.autoCompletarRut()" autocomplete="off">
+                <input type="text" id="modal-medRut" placeholder="RUT del médico">
+            </div>
+            <datalist id="medicosList"></datalist>`;
+    }
+    window.refrescarDatalistMedicosDOM();
+
+    const inpMed = document.getElementById("modal-medNombre");
+    const inpRut = document.getElementById("modal-medRut");
+    if (inpMed && (regPrevio.medico || regPrevio.medicoAutorizador)) inpMed.value = regPrevio.medico || regPrevio.medicoAutorizador;
+    if (inpRut && regPrevio.rut && regPrevio.rut !== "S/R") inpRut.value = regPrevio.rut;
+
+    window.configurarAutocompletadoBidireccionalMedico();
+    window.actualizarFichaInformativaAlbumina();
+};
+
+window.actualizarFichaInformativaAlbumina = function () {
+    const sel = document.getElementById("alb-select-diagnostico");
+    const inpOtro = document.getElementById("alb-input-otro-diag");
+    const ficha = document.getElementById("alb-ficha-tecnica");
+    if (!sel || !ficha) return;
+
+    const id = sel.value;
+    if (inpOtro) inpOtro.style.display = (id === "OTRO") ? "block" : "none";
+
+    const proto = window.CATALOGO_PROTOCOLO_ALBUMina[id] || window.CATALOGO_PROTOCOLO_ALBUMina["OTRO"];
+    const fila = window.filaActivaModal;
+    const metricas = fila ? window.calcularMetricasAlbuminaFila(fila) : { frascos: 0, gramos: 0, dias: 1 };
+
+    const textoMaxDosis = proto.maxGramos !== null
+        ? `${proto.maxGramos} g (${proto.maxFrascos} frascos)`
+        : "Dosis máxima no establecida";
+
+    const alertaGramos = (proto.maxGramos !== null && metricas.gramos > proto.maxGramos);
+    const alertaDias = (proto.maxDias !== null && metricas.dias > proto.maxDias);
+
+    ficha.innerHTML = `
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+            <div style="background: rgba(255,255,255,0.04); padding: 6px 8px; border-radius: 6px; border-left: 3px solid var(--accent-blue);">
+                <div style="font-size: 10px; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">Dosis Albúmina / Día</div>
+                <div style="font-weight: 800; color: var(--text-main); margin-top: 2px; font-size: 11.5px;">${proto.dosisDia}</div>
+            </div>
+            <div style="background: rgba(255,255,255,0.04); padding: 6px 8px; border-radius: 6px; border-left: 3px solid ${alertaGramos ? 'var(--accent-red)' : 'var(--accent-green)'};">
+                <div style="font-size: 10px; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">Dosis Máx. Paciente</div>
+                <div style="font-weight: 900; color: ${alertaGramos ? 'var(--accent-red)' : 'var(--accent-green)'}; margin-top: 2px; font-size: 12px;">
+                    ${textoMaxDosis}
+                </div>
+                <div style="font-size: 10px; color: var(--text-muted);">Actual: ${metricas.gramos} g (${metricas.frascos} fcos)</div>
+            </div>
+            <div style="background: rgba(255,255,255,0.04); padding: 6px 8px; border-radius: 6px; border-left: 3px solid ${alertaDias ? 'var(--accent-red)' : '#ff9800'};">
+                <div style="font-size: 10px; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">Duración Máxima</div>
+                <div style="font-weight: 900; color: ${alertaDias ? 'var(--accent-red)' : 'var(--text-main)'}; margin-top: 2px; font-size: 12px;">
+                    ${proto.textoDuracion}
+                </div>
+                <div style="font-size: 10px; color: var(--text-muted);">Regla: Lo que se cumpla primero</div>
+            </div>
+        </div>
+        <div style="font-size: 11.5px; color: var(--text-muted); border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 6px;">
+            <b style="color: #ff9800;">Consideraciones Clínicas:</b> ${proto.consideraciones}
+        </div>
+    `;
+};
+
+// 5. Función para aplicar el estado visual y abrir el modal de Albúmina
+window.aplicarProtocoloAlbuminaEnGrilla = function (filaRecienEditada = null) {
+    const filas = document.querySelectorAll("#grillaFila tr");
+    filas.forEach(fila => {
+        const inputs = fila.querySelectorAll("input");
+        const medNombre = (inputs[0]?.value || "").trim();
+        const posoTexto = (inputs[3]?.value || "").trim();
+        if (!medNombre || !posoTexto) return;
+
+        const medNorm = window.quitarTildes(medNombre.toLowerCase());
+        if (!medNorm.includes("albumina")) return;
+
+        const celdaResultado = inputs[4];
+        const estadoAlb = window.evaluarEstadoProtocoloAlbumina(fila);
+
+        if (estadoAlb.cumple) {
+            celdaResultado.classList.remove("alerta-interaccion", "alerta-sobredosis");
+            celdaResultado.value = estadoAlb.etiquetaBoton;
+            celdaResultado.style.color = "var(--accent-green)";
+            celdaResultado.style.fontWeight = "900";
+            celdaResultado.style.cursor = "pointer";
+            celdaResultado.title = `${estadoAlb.motivo} (Clic para ver o editar protocolo de Albúmina)`;
+            celdaResultado.onclick = () => window.abrirModalProtocoloAlbumina(fila, medNombre);
+        } else {
+            celdaResultado.classList.add("alerta-interaccion");
+            celdaResultado.value = estadoAlb.etiquetaBoton;
+            celdaResultado.style.color = estadoAlb.codigo === "LIMITE_ALCANZADO" ? "var(--accent-red)" : "#ff9800";
+            celdaResultado.style.fontWeight = "900";
+            celdaResultado.style.cursor = "pointer";
+            celdaResultado.title = `${estadoAlb.motivo} (Clic para gestionar protocolo de Albúmina)`;
+            celdaResultado.onclick = () => window.abrirModalProtocoloAlbumina(fila, medNombre);
+
+            if (!window.isCargandoPerfil && filaRecienEditada && filaRecienEditada === fila) {
+                window.abrirModalProtocoloAlbumina(fila, medNombre);
+            }
+        }
+    });
+};
+
+const _escanearRestringidosBase = window.escanearRestringidos;
+window.escanearRestringidos = function (filaEditada = null) {
+    if (typeof _escanearRestringidosBase === "function") {
+        try { _escanearRestringidosBase(filaEditada); } catch (e) { console.warn(e); }
+    }
+    window.aplicarProtocoloAlbuminaEnGrilla(filaEditada);
+};
+
+// Escuchador directo en la grilla: cuando se edite una fila con Albúmina, lanza el modal automáticamente
+document.getElementById("grillaFila")?.addEventListener("change", function (e) {
+    const input = e.target;
+    if (!input || input.tagName !== "INPUT") return;
+    const fila = input.closest("tr");
+    if (!fila) return;
+
+    const inputs = fila.querySelectorAll("input");
+    const medNombre = (inputs[0]?.value || "").trim();
+    const posoTexto = (inputs[3]?.value || "").trim();
+    if (!medNombre) return;
+
+    const medNorm = window.quitarTildes(medNombre.toLowerCase());
+    if (medNorm.includes("albumina") && posoTexto !== "") {
+        setTimeout(() => {
+            window.aplicarProtocoloAlbuminaEnGrilla(fila);
+        }, 60);
+    }
+});
+
+window.abrirModalProtocoloAlbumina = function (fila, medNombre) {
+    window.filaActivaModal = fila;
+    window.autorizacionesPorFila = window.autorizacionesPorFila || {};
+    const estadoAlb = window.evaluarEstadoProtocoloAlbumina(fila);
+
+    const tituloPrincipal = document.getElementById("modal-titulo-principal");
+    const badgeTipo = document.getElementById("modal-badge-tipo");
+    const iconoHeader = document.querySelector("#modal-overlay .modal-header .material-icons-round");
+
+    if (tituloPrincipal) tituloPrincipal.innerText = "PROTOCOLO ALBÚMINA HUMANA";
+    if (badgeTipo) {
+        badgeTipo.innerText = estadoAlb.codigo === "LIMITE_ALCANZADO" ? "LÍMITE SUPERADO" : "DIAGNÓSTICO + SIDRA";
+        badgeTipo.style.background = estadoAlb.codigo === "LIMITE_ALCANZADO" ? "var(--accent-red)" : "#ff9800";
+        badgeTipo.style.color = "#fff";
+    }
+    if (iconoHeader) {
+        iconoHeader.textContent = "verified_user";
+        iconoHeader.style.color = estadoAlb.codigo === "LIMITE_ALCANZADO" ? "var(--accent-red)" : "#ff9800";
+    }
+
+    window.renderizarPanelModalAlbumina(fila);
+
+    // Ocultar botón secundario de dejar pendiente para que todo se controle con los radios SÍ/PENDIENTE/NO
+    const btnPendiente = document.getElementById("btn-dejar-pendiente");
+    if (btnPendiente) btnPendiente.style.display = "none";
+
+    // Mostrar el overlay con display: flex (indispensable en tu CSS)
+    const overlay = document.getElementById("modal-overlay");
+    if (overlay) {
+        overlay.style.display = "flex";
+        void overlay.offsetHeight;
+        overlay.classList.add("show");
+    }
+
+    const btnAceptar = document.getElementById("btn-aceptar-dosis");
+    if (btnAceptar) {
+        btnAceptar.innerText = estadoAlb.codigo === "LIMITE_ALCANZADO"
+            ? "AUTORIZAR EXTENSIÓN (JEFE SERVICIO)"
+            : "REGISTRAR PROTOCOLO ALBÚMINA";
+
+        btnAceptar.onclick = async function () {
+            const diagId = document.getElementById("alb-select-diagnostico")?.value || "SHOCK_SEPTICO";
+            const otroTxt = (document.getElementById("alb-input-otro-diag")?.value || "").trim();
+            const radioReceta = document.querySelector('input[name="albRecetaSidra"]:checked');
+            const recetaVal = radioReceta ? radioReceta.value : "SI";
+
+            const nombreMedAutoriza = (document.getElementById("modal-medNombre")?.value || "").trim();
+            const rutMedAutoriza = (document.getElementById("modal-medRut")?.value || "").trim();
+
+            if (diagId === "OTRO" && !otroTxt) {
+                alert("⚠️ Por favor escriba el diagnóstico libre para la indicación fuera de protocolo.");
+                return;
+            }
+
+            if (!nombreMedAutoriza) {
+                alert("⚠️ Ingrese el Nombre del Médico prescriptor / autorizador.");
+                return;
+            }
+
+            await window.guardarMedicoNuevoSiNoExiste(nombreMedAutoriza, rutMedAutoriza);
+
+            const rowId = fila.dataset.row;
+            const metricasHoy = window.calcularMetricasAlbuminaFila(fila);
+            const proto = window.CATALOGO_PROTOCOLO_ALBUMina[diagId] || window.CATALOGO_PROTOCOLO_ALBUMina["OTRO"];
+            const excedeHoy = (proto.maxGramos !== null && metricasHoy.gramos > proto.maxGramos) ||
+                              (proto.maxDias !== null && metricasHoy.dias > proto.maxDias);
+
+            const nombreDiagFinal = diagId === "OTRO" ? otroTxt : proto.nombre;
+            const firmaAlb = `${rowId}|${medNombre.toLowerCase()}`;
+
+            const datosRegistro = {
+                estado: (recetaVal === "SI") ? "ACEPTADO" : "PENDIENTE",
+                rowId,
+                medicamento: medNombre.toLowerCase(),
+                especialidad: `Albúmina (${nombreDiagFinal} · Receta: ${recetaVal})`,
+                medicos: [],
+                tipo: "ALBUMINA",
+                esProtocoloAlbumina: true,
+                diagnosticoId: diagId,
+                diagnosticoNombre: nombreDiagFinal,
+                diagnosticoOtroTexto: otroTxt,
+                recetaSidra: recetaVal,
+                medico: nombreMedAutoriza.toUpperCase(),
+                medicoAutorizador: `${nombreMedAutoriza.toUpperCase()} (${nombreDiagFinal})`,
+                rut: rutMedAutoriza || "S/R",
+                fecha: new Date().toLocaleDateString('es-CL'),
+                extensionJefeAutorizada: excedeHoy,
+                gramosAutorizadosExtension: excedeHoy ? metricasHoy.gramos : (proto.maxGramos || 9999),
+                diasAutorizadosExtension: excedeHoy ? metricasHoy.dias : (proto.maxDias || 999)
+            };
+
+            window.autorizacionesPorFila[rowId] = datosRegistro;
+            window.medicamentosPendientes[firmaAlb] = datosRegistro;
+
+            let llaveLocal = window.obtenerLlaveMaestraPaciente ? window.obtenerLlaveMaestraPaciente() : "sin_rut";
+            localStorage.setItem("pendientes_" + llaveLocal, JSON.stringify(window.medicamentosPendientes));
+
+            if (recetaVal !== "SI" && typeof window.enviarSolicitudVisacionQF === "function") {
+                await window.enviarSolicitudVisacionQF(firmaAlb);
+            } else if (typeof window.limpiarSolicitudVisacionPorResolucionLocal === "function") {
+                window.limpiarSolicitudVisacionPorResolucionLocal(rowId, medNombre);
+            }
+
+            window.resetearCerrarModal();
+            window.aplicarProtocoloAlbuminaEnGrilla();
+            window.actualizarSidebarPendientes();
+            if (typeof window.programarAutoguardado === "function") window.programarAutoguardado();
+        };
+    }
 };
