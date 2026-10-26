@@ -1148,26 +1148,46 @@ body.light-theme .input-nuevo-concil {
     }
 }
 /* =========================================================
-   ESTABILIZADOR DE GPU (ANTI-PARPADEO AL HACER SCROLL EN MODALES)
+   ESTABILIZADOR DE GPU GLOBAL (PÁGINA PRINCIPAL + MODALES)
    ========================================================= */
 @media screen {
-    /* 1. Fijar el overlay y el contenedor en su propia capa de GPU para no recalcular el blur de fondo */
-    .modal-overlay,
-    .modal-container {
+    /* 1. Desactivar backdrop-filter pesado en los paneles principales durante el scroll y promover a capa GPU */
+    .main-content.glass-panel,
+    .sidebar.glass-panel,
+    .modal-overlay .modal-container {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        background: var(--panel-bg) !important;
         -webkit-transform: translateZ(0);
         transform: translateZ(0);
         -webkit-backface-visibility: hidden;
         backface-visibility: hidden;
     }
 
-    /* 2. Desactivar el doble backdrop-filter interno dentro de los modales que ya tienen overlay con blur */
-    .modal-overlay .modal-container {
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
-        background: var(--panel-bg) !important;
+    /* 2. Aislar el contenedor de la grilla farmacológica y sus celdas sticky para scroll suave a 60fps */
+    .main-content,
+    .med-grid-scroll-wrapper,
+    .nutricion-list {
+        will-change: scroll-position;
+        -webkit-overflow-scrolling: touch;
+        -webkit-transform: translate3d(0, 0, 0);
+        transform: translate3d(0, 0, 0);
+        overscroll-behavior: contain;
     }
 
-    /* 3. Aislar el repintado (contain: paint) en las listas con scroll de Conciliación, Consolidado, Visación y Censo */
+    .med-grid thead th,
+    .med-grid tbody td:nth-child(1),
+    .med-grid tbody td:nth-child(2),
+    .med-grid tbody td:nth-child(3),
+    .med-grid tbody td:nth-child(4) {
+        -webkit-transform: translateZ(0);
+        transform: translateZ(0);
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
+    }
+
+    /* 3. Aislar listas internas de todos los modales */
+    .modal-overlay,
     #lista-farmacos-conciliacion,
     #contenedor-tabla-consolidado,
     #contenedor-items-visacion,
@@ -1181,7 +1201,6 @@ body.light-theme .input-nuevo-concil {
         overscroll-behavior: contain;
     }
 
-    /* 4. Evitar que la cabecera sticky del Consolidado use transparencia que fuerce repintado al bajar */
     #contenedor-tabla-consolidado thead tr {
         background: #14242d !important;
         -webkit-transform: translateZ(0);
@@ -1189,5 +1208,156 @@ body.light-theme .input-nuevo-concil {
     }
     body.light-theme #contenedor-tabla-consolidado thead tr {
         background: #dce8f3 !important;
+    }
+}
+
+/* =========================================================
+   MEJORA DE CONTRASTE MODO CLARO (MODAL ALBÚMINA) Y COLUMNA CDSS VISIBLE
+   ========================================================= */
+@media screen {
+    /* Mantener la 5ta columna (CDSS / Alerta) siempre visible junto a Posología */
+    .med-grid col:nth-child(5),
+    .med-grid thead tr:nth-child(1) th:nth-child(3),
+    .med-grid thead tr:nth-child(2) th:nth-child(5),
+    .med-grid tbody td:nth-child(5) {
+        width: 110px !important;
+        min-width: 110px !important;
+        max-width: 110px !important;
+        position: -webkit-sticky !important;
+        position: sticky !important;
+        left: 455px !important;
+        z-index: 20 !important;
+        box-sizing: border-box !important;
+        border-right: 2px solid var(--accent-blue) !important;
+        box-shadow: 4px 0 8px rgba(0, 0, 0, 0.18) !important;
+    }
+
+    .med-grid thead tr:nth-child(2) th:nth-child(4),
+    .med-grid tbody td:nth-child(4) {
+        border-right: 1px solid var(--glass-border) !important;
+        box-shadow: none !important;
+    }
+
+    .med-grid tbody td:nth-child(5) {
+        background-color: #162831 !important;
+    }
+    body.light-theme .med-grid tbody td:nth-child(5) {
+        background-color: #e4eef7 !important;
+    }
+    .med-grid thead tr:nth-child(1) th:nth-child(3),
+    .med-grid thead tr:nth-child(2) th:nth-child(5) {
+        background-color: #12222a !important;
+    }
+    body.light-theme .med-grid thead tr:nth-child(1) th:nth-child(3),
+    body.light-theme .med-grid thead tr:nth-child(2) th:nth-child(5) {
+        background-color: #d5e4f2 !important;
+    }
+
+    /* Alto contraste para el Modal de Albúmina en Modo Claro */
+    body.light-theme #alb-ficha-tecnica {
+        background: #f8fafc !important;
+        border: 1.5px solid #cbd5e1 !important;
+        box-shadow: inset 0 1px 3px rgba(0,0,0,0.05) !important;
+    }
+    body.light-theme #alb-ficha-tecnica .alb-card-item {
+        background: #ffffff !important;
+        border-top: 1px solid #e2e8f0;
+        border-right: 1px solid #e2e8f0;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    body.light-theme .alb-subtitulo-guia {
+        color: #b45309 !important; /* Ámbar oscuro legible sobre fondo claro */
+    }
+    body.light-theme .alb-badge-proyeccion {
+        background: #e0f2fe !important;
+        border-color: #0284c7 !important;
+        color: #0369a1 !important;
+    }
+    body.light-theme .alb-label-paso {
+        color: #0369a1 !important;
+    }
+    body.light-theme .alb-txt-secundario {
+        color: #334155 !important;
+        font-weight: 600 !important;
+    }
+    body.light-theme .alb-txt-ok {
+        color: #15803d !important;
+    }
+    body.light-theme .alb-txt-peligro {
+        color: #b91c1c !important;
+    }
+    body.light-theme .alb-box-sidra {
+        background: #f1f5f9 !important;
+        border-color: #cbd5e1 !important;
+    }
+    body.light-theme .alb-radio-si {
+        background: #dcfce7 !important;
+        border-color: #16a34a !important;
+        color: #15803d !important;
+    }
+    body.light-theme .alb-radio-pend {
+        background: #fef3c7 !important;
+        border-color: #d97706 !important;
+        color: #b45309 !important;
+    }
+    body.light-theme .alb-radio-no {
+        background: #fee2e2 !important;
+        border-color: #dc2626 !important;
+        color: #b91c1c !important;
+    }
+    body.light-theme .alb-banner-limite {
+        background: #fef2f2 !important;
+        border: 2px solid #dc2626 !important;
+        color: #991b1b !important;
+    }
+    body.light-theme .alb-banner-dia {
+        background: #eff6ff !important;
+        border: 1.5px solid #2563eb !important;
+        color: #1e3a8a !important;
+    }
+}
+
+/* =========================================================
+   ALTO CONTRASTE EN MODO CLARO PARA PIZARRA QF Y TEXTOS AZULES/ÁMBAR
+   ========================================================= */
+@media screen {
+    body.light-theme #modal-info-clinica-qf .qf-form-box,
+    body.light-theme #modal-consolidado-servicio .consolidado-controls-bar {
+        background: #f8fafc !important;
+        border: 1.5px solid #cbd5e1 !important;
+    }
+
+    body.light-theme #modal-info-clinica-qf .qf-lbl-paso {
+        color: #0369a1 !important; /* Azul marino profundo de alta legibilidad */
+        font-weight: 900 !important;
+    }
+
+    body.light-theme #modal-info-clinica-qf .qf-radio-info {
+        background: #e0f2fe !important;
+        border-color: #0284c7 !important;
+        color: #0369a1 !important;
+    }
+
+    body.light-theme #modal-info-clinica-qf .qf-radio-imp {
+        background: #fef3c7 !important;
+        border-color: #d97706 !important;
+        color: #b45309 !important;
+    }
+
+    body.light-theme #modal-info-clinica-qf .qf-radio-urg {
+        background: #fee2e2 !important;
+        border-color: #dc2626 !important;
+        color: #b91c1c !important;
+    }
+
+    body.light-theme #modal-info-clinica-qf #qf-input-nuevo-aviso {
+        background: #ffffff !important;
+        border: 1.5px solid #94a3b8 !important;
+        color: #0f172a !important;
+    }
+
+    body.light-theme #modal-info-clinica-qf .qf-item-aviso {
+        background: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
     }
 }

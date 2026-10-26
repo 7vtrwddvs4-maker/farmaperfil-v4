@@ -6803,7 +6803,7 @@ window.imprimirConsolidadoServicio = function () {
 };
 
 // ============================================================================
-// 20. PROTOCOLO INSTITUCIONAL DE ALBÚMINA HUMANA 20% (DIAGNÓSTICO + SIDRA + LÍMITE DUAL)
+// 20. PROTOCOLO INSTITUCIONAL DE ALBÚMINA HUMANA 20% (SOPORTE ESTADO RECHAZADO + BOTÓN RESOLVER)
 // ============================================================================
 window.autorizacionesPorFila = window.autorizacionesPorFila || {};
 
@@ -6888,6 +6888,15 @@ window.CATALOGO_PROTOCOLO_ALBUMina = {
         textoDuracion: "Sujeto a autorización por Jefe de Servicio",
         consideraciones: "Indicación fuera de protocolo estándar. Requiere justificación clínica, receta SIDRA y autorización por Jefe de Servicio."
     }
+};
+
+window.obtenerColumnaDiaActivaGrilla = function () {
+    let colActiva = 0;
+    const headersF = document.querySelectorAll(".header-fecha");
+    for (let i = 0; i < headersF.length; i++) {
+        if (headersF[i].value.trim() !== "") colActiva = i;
+    }
+    return colActiva;
 };
 
 // 1. Base de datos de Médicos auto-aprendible sincronizada con window.medicosData
@@ -6977,78 +6986,127 @@ setTimeout(() => {
     window.configurarAutocompletadoBidireccionalMedico();
 }, 1800);
 
-// 2. Cálculo exacto de Frascos, Gramos (1 frasco = 10 g) y Días de Albúmina en la fila
-window.calcularMetricasAlbuminaFila = function (fila) {
+// 2. Cálculo exacto de Frascos, Gramos (1 frasco = 10 g) y Días de Albúmina
+window.calcularMetricasAlbuminaFila = function (fila, incluirProyeccionHoySiVacio = true) {
     const inputs = fila.querySelectorAll("input");
+    const colActiva = window.obtenerColumnaDiaActivaGrilla();
     let totalFrascos = 0;
     let diasActivos = 0;
+    let tieneValorOSiEnColActiva = false;
 
     for (let d = 5; d < inputs.length; d++) {
         const raw = (inputs[d].value || "").replace("✓", "").trim().toUpperCase();
-        if (!raw || raw === "S/I" || raw === "-") continue;
+        if (!raw || raw === "-") continue;
+
+        if (raw === "S/I") {
+            if ((d - 5) === colActiva) tieneValorOSiEnColActiva = true;
+            continue;
+        }
 
         if (raw === "T") {
             diasActivos++;
+            if ((d - 5) === colActiva) tieneValorOSiEnColActiva = true;
         } else {
             const num = parseFloat(raw.replace(",", "."));
             if (!isNaN(num) && num > 0) {
                 totalFrascos += num;
                 diasActivos++;
+                if ((d - 5) === colActiva) tieneValorOSiEnColActiva = true;
             }
         }
     }
 
-    // Si aún no hay celdas de días llenas pero ya escribieron dosis y posología, estimar primer día
-    if (totalFrascos === 0) {
-        const medTxt = inputs[0]?.value || "";
-        const viaTxt = inputs[1]?.value || "";
-        const dosTxt = inputs[2]?.value || "";
-        const posTxt = inputs[3]?.value || "";
-        const est = parseFloat(window.calcularDosisFila(medTxt, viaTxt, dosTxt, posTxt, 1, null)) || 0;
-        if (est > 0) {
-            totalFrascos = est;
-            diasActivos = 1;
-        }
+    const medTxt = inputs[0]?.value || "";
+    const viaTxt = inputs[1]?.value || "";
+    const dosTxt = inputs[2]?.value || "";
+    const posTxt = inputs[3]?.value || "";
+    const factorDesp = typeof window.obtenerFactorDespachoActivo === "function" ? window.obtenerFactorDespachoActivo() : 1;
+    const frascosCalculadosHoy = parseFloat(window.calcularDosisFila(medTxt, viaTxt, dosTxt, posTxt, factorDesp, null)) || 0;
+
+    if (incluirProyeccionHoySiVacio && !tieneValorOSiEnColActiva && frascosCalculadosHoy > 0) {
+        totalFrascos += frascosCalculadosHoy;
+        diasActivos += 1;
     }
 
     return {
         frascos: totalFrascos,
         gramos: totalFrascos * 10,
-        dias: Math.max(1, diasActivos)
+        dias: Math.max(1, diasActivos),
+        frascosCalculadosHoy: frascosCalculadosHoy,
+        colActiva: colActiva
     };
 };
 
-// 3. Evaluador de cumplimiento del protocolo de Albúmina ("Lo que ocurra primero": Dosis Máxima vs Días)
+window.sincronizarUnidadesDiaActivoAlbumina = function (fila, modoAccion) {
+    if (!fila) return;
+    const inputs = fila.querySelectorAll("input");
+    const colActiva = window.obtenerColumnaDiaActivaGrilla();
+    const celdaHoy = inputs[5 + colActiva];
+    if (!celdaHoy) return;
+
+    const valActual = celdaHoy.value.replace("✓", "").trim().toUpperCase();
+
+    if (modoAccion === "RECHAZADO") {
+        // Si fue rechazado, estampar "S/I" en rojo
+        celdaHoy.value = "S/I";
+        window.syncCheckUI(celdaHoy);
+        return;
+    }
+
+    if (modoAccion === "BLOQUEAR") {
+        if (valActual === "S/I" || valActual === "-") return;
+        celdaHoy.value = "";
+        delete celdaHoy.dataset.manual;
+        window.syncCheckUI(celdaHoy);
+    } else if (modoAccion === "LIBERAR") {
+        // Si estaba vacío o tenía "S/I" de un rechazo previo y ahora decidieron autorizarlo, poner las unidades
+        if (valActual === "" || valActual === "S/I") {
+            delete celdaHoy.dataset.omitidoConciliacion;
+            delete celdaHoy.dataset.manual;
+            const factorDesp = typeof window.obtenerFactorDespachoActivo === "function" ? window.obtenerFactorDespachoActivo() : 1;
+            const unid = window.calcularDosisFila(inputs[0].value, inputs[1].value, inputs[2].value, inputs[3].value, factorDesp, null);
+            if (unid !== "") {
+                celdaHoy.value = unid;
+                celdaHoy.style.color = "var(--text-main)";
+                celdaHoy.style.fontWeight = "900";
+                window.syncCheckUI(celdaHoy);
+            }
+        }
+    }
+};
+
+// 3. Evaluador con soporte explícito para RECHAZADO (por QF o por Receta SIDRA = NO)
 window.evaluarEstadoProtocoloAlbumina = function (fila) {
     window.autorizacionesPorFila = window.autorizacionesPorFila || {};
     const rowId = fila.dataset.row;
-    const metricas = window.calcularMetricasAlbuminaFila(fila);
+    const metricas = window.calcularMetricasAlbuminaFila(fila, true);
     const nombreMed = (fila.querySelectorAll("input")[0]?.value || "").trim().toLowerCase();
     const firmaAlb = `${rowId}|${nombreMed}`;
 
-    // Rescatar datos desde autorizacionesPorFila o desde medicamentosPendientes (persistencia en Firestore)
-    let reg = window.autorizacionesPorFila[rowId] || window.medicamentosPendientes?.[firmaAlb];
+    let reg = window.medicamentosPendientes?.[firmaAlb] || window.autorizacionesPorFila[rowId];
 
-    if (!reg || !reg.esProtocoloAlbumina || !reg.diagnosticoId) {
+    if (!reg || (!reg.esProtocoloAlbumina && reg.tipo !== "ALBUMINA")) {
         return {
             cumple: false,
             codigo: "SIN_PROTOCOLO",
             etiquetaBoton: "⚠️ REQ. DIAG/SIDRA",
-            motivo: "El despacho de Albúmina Humana 20% requiere seleccionar un Diagnóstico del protocolo institucional y registrar el estado de la Receta SIDRA.",
+            motivo: "El despacho de Albúmina Humana 20% requiere seleccionar un Diagnóstico del protocolo institucional y registrar la Receta SIDRA del día.",
             metricas
         };
     }
 
-    const proto = window.CATALOGO_PROTOCOLO_ALBUMina[reg.diagnosticoId] || window.CATALOGO_PROTOCOLO_ALBUMina["OTRO"];
+    const proto = window.CATALOGO_PROTOCOLO_ALBUMina[reg.diagnosticoId] || window.CATALOGO_PROTOCOLO_ALBUMina["SHOCK_SEPTICO"];
     const nombreDiagMostrar = reg.diagnosticoId === "OTRO" ? (reg.diagnosticoOtroTexto || "Otro diagnóstico") : proto.nombre;
+    const colAutorizadaPrevia = reg.colDiaAutorizado !== undefined ? reg.colDiaAutorizado : -1;
+    const esMismoDiaValidado = (colAutorizadaPrevia === metricas.colActiva);
 
-    if (reg.recetaSidra !== "SI") {
-        const estadoRecetaTxt = reg.recetaSidra === "PENDIENTE" ? "⏳ RECETA PEND." : "❌ SIN RECETA";
+    // 1° Si fue RECHAZADO por QF o marcado con Receta = NO en el día activo
+    if (reg.estado === "RECHAZADO" || (esMismoDiaValidado && reg.recetaSidra === "NO")) {
         return {
             cumple: false,
-            codigo: "FALTA_RECETA",
-            etiquetaBoton: estadoRecetaTxt,
-            motivo: `Diagnóstico: ${nombreDiagMostrar}. El protocolo exige Receta SIDRA activa (Estado actual: ${reg.recetaSidra || "NO"}).`,
+            codigo: "RECHAZADO_QF",
+            etiquetaBoton: "❌ RECHAZADO QF",
+            motivo: reg.observacionQF || `Sin autorización / Sin Receta SIDRA (${nombreDiagMostrar})`,
             metricas,
             proto
         };
@@ -7057,31 +7115,62 @@ window.evaluarEstadoProtocoloAlbumina = function (fila) {
     const excedeGramos = proto.maxGramos !== null && metricas.gramos > proto.maxGramos;
     const excedeDias = proto.maxDias !== null && metricas.dias > proto.maxDias;
 
+    // 2° Si supera los días máximos o gramos máximos estipulados en el protocolo
     if (excedeGramos || excedeDias) {
-        if (reg.extensionJefeAutorizada && metricas.gramos <= (reg.gramosAutorizadosExtension || 0) && metricas.dias <= (reg.diasAutorizadosExtension || 0)) {
+        let detalleExceso = [];
+        if (excedeDias) {
+            detalleExceso.push(`el paciente cursa el <b>Día ${metricas.dias}</b> de tratamiento (máximo permitido: <b>${proto.maxDias} días</b>)`);
+        }
+        if (excedeGramos) {
+            detalleExceso.push(`la dosis acumulada de <b>${metricas.gramos} g (${metricas.frascos} frascos)</b> supera el tope de <b>${proto.maxGramos} g (${proto.maxFrascos} frascos)</b>`);
+        }
+
+        const tieneExtensionValidaHoy = esMismoDiaValidado &&
+            reg.recetaSidra === "SI" &&
+            reg.extensionJefeAutorizada === true &&
+            metricas.gramos <= (reg.gramosAutorizadosExtension || 0) &&
+            metricas.dias <= (reg.diasAutorizadosExtension || 0);
+
+        if (tieneExtensionValidaHoy) {
             return {
                 cumple: true,
                 codigo: "EXTENSION_OK",
-                etiquetaBoton: "✅ EXT. AUTORIZADA",
-                motivo: `Extensión autorizada por Jefe de Servicio (${reg.medico || reg.medicoAutorizador || "Médico"}).`,
+                etiquetaBoton: "✅ EXT. JEFE OK",
+                motivo: `Extensión fuera de protocolo autorizada por Jefe de Servicio (${reg.medico || "Médico"}) para Día ${metricas.dias}.`,
                 metricas,
                 proto
             };
         }
 
-        let detalleExceso = [];
-        if (excedeGramos) {
-            detalleExceso.push(`Dosis acumulada de ${metricas.gramos} g (${metricas.frascos} frascos) supera el máximo de ${proto.maxGramos} g (${proto.maxFrascos} frascos)`);
-        }
-        if (excedeDias) {
-            detalleExceso.push(`Duración actual de ${metricas.dias} días supera el tope de ${proto.maxDias} día(s)`);
-        }
-
         return {
             cumple: false,
             codigo: "LIMITE_ALCANZADO",
-            etiquetaBoton: "⚠️ LÍMITE ALBÚMINA",
-            motivo: `⚠️ LÍMITE ALCANZADO (${nombreDiagMostrar}): ${detalleExceso.join(" y ")}. Según guía farmacoterapéutica (lo que ocurra primero), todo requerimiento adicional exige autorización por Jefe de Servicio.`,
+            etiquetaBoton: "🚨 LÍMITE SUPERADO",
+            motivo: `🚨 PACIENTE FUERA DE PROTOCOLO (${nombreDiagMostrar}): Se ha superado el límite porque ${detalleExceso.join(" y ")}. Requiere Autorización Excepcional por Jefe de Servicio + Receta SIDRA del día.`,
+            metricas,
+            proto
+        };
+    }
+
+    // 3° Si cambió al siguiente día y falta validar Receta SIDRA hoy
+    if (!esMismoDiaValidado) {
+        return {
+            cumple: false,
+            codigo: "NUEVO_DIA_SIDRA",
+            etiquetaBoton: "⚠️ SIDRA DÍA " + (metricas.colActiva + 1),
+            motivo: `Nuevo día de tratamiento (Día ${metricas.dias} de ${proto.maxDias || "∞"} · Diagnóstico: ${nombreDiagMostrar}). Confirme la Receta SIDRA de hoy antes de despachar.`,
+            metricas,
+            proto
+        };
+    }
+
+    // 4° Si la receta SIDRA de hoy quedó como PENDIENTE
+    if (reg.recetaSidra !== "SI" || reg.estado === "PENDIENTE") {
+        return {
+            cumple: false,
+            codigo: "FALTA_RECETA",
+            etiquetaBoton: "⏳ PENDIENTE QF",
+            motivo: `Diagnóstico: ${nombreDiagMostrar}. Enviado a visación QF / Esperando Receta SIDRA.`,
             metricas,
             proto
         };
@@ -7091,13 +7180,13 @@ window.evaluarEstadoProtocoloAlbumina = function (fila) {
         cumple: true,
         codigo: "OK",
         etiquetaBoton: "✅ ALBÚMINA OK",
-        motivo: `Protocolo activo: ${nombreDiagMostrar} (${metricas.gramos}/${proto.maxGramos || "∞"} g · Día ${metricas.dias}/${proto.maxDias || "∞"} · Receta SIDRA: SÍ).`,
+        motivo: `Protocolo activo hoy: ${nombreDiagMostrar} (${metricas.gramos}/${proto.maxGramos || "∞"} g · Día ${metricas.dias}/${proto.maxDias || "∞"} · Receta SIDRA: SÍ).`,
         metricas,
         proto
     };
 };
 
-// 4. Inyección de la Interfaz Clínica de Albúmina dentro del Modal de Seguridad
+// 4. Inyección de la Interfaz Clínica de Albúmina
 window.renderizarPanelModalAlbumina = function (fila) {
     const cajaMensaje = document.getElementById("modal-mensaje");
     if (!cajaMensaje) return;
@@ -7106,10 +7195,10 @@ window.renderizarPanelModalAlbumina = function (fila) {
     const rowId = fila.dataset.row;
     const nombreMed = (fila.querySelectorAll("input")[0]?.value || "").trim().toLowerCase();
     const firmaAlb = `${rowId}|${nombreMed}`;
-    const regPrevio = window.autorizacionesPorFila[rowId] || window.medicamentosPendientes?.[firmaAlb] || {};
+    const regPrevio = window.medicamentosPendientes?.[firmaAlb] || window.autorizacionesPorFila[rowId] || {};
     const estado = window.evaluarEstadoProtocoloAlbumina(fila);
     const diagInicial = regPrevio.diagnosticoId || "SHOCK_SEPTICO";
-    const recetaInicial = regPrevio.recetaSidra || "SI";
+    const recetaInicial = (estado.codigo === "NUEVO_DIA_SIDRA" || estado.codigo === "LIMITE_ALCANZADO" || estado.codigo === "RECHAZADO_QF") ? "SI" : (regPrevio.recetaSidra || "SI");
     const otroTextoInicial = regPrevio.diagnosticoOtroTexto || "";
 
     const opcionesSelect = Object.values(window.CATALOGO_PROTOCOLO_ALBUMina).map(p =>
@@ -7118,24 +7207,20 @@ window.renderizarPanelModalAlbumina = function (fila) {
 
     cajaMensaje.innerHTML = `
         <div style="text-align: left; display: flex; flex-direction: column; gap: 10px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.12); padding-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid var(--glass-border); padding-bottom: 8px;">
                 <div>
-                    <span style="font-size: 11px; font-weight: 900; color: #ff9800; text-transform: uppercase;">Guía Farmacoterapéutica · Todos los Servicios</span>
+                    <span class="alb-subtitulo-guia" style="font-size: 11px; font-weight: 900; color: #ffab00; text-transform: uppercase;">Guía Farmacoterapéutica · Control Diario SIDRA</span>
                     <div style="font-size: 14px; font-weight: 900; color: var(--text-main);">ALBÚMINA HUMANA 20% (10 g / 50 mL)</div>
                 </div>
-                <div style="background: rgba(64,196,255,0.12); border: 1px solid var(--accent-blue); padding: 5px 10px; border-radius: 8px; font-size: 11.5px; font-weight: 800; color: var(--accent-blue);">
-                    Acumulado Paciente: <b>${estado.metricas.gramos} g</b> (${estado.metricas.frascos} fcos) · <b>Día ${estado.metricas.dias}</b>
+                <div class="alb-badge-proyeccion" style="background: rgba(64,196,255,0.14); border: 1.5px solid var(--accent-blue); padding: 5px 10px; border-radius: 8px; font-size: 11.5px; font-weight: 800; color: var(--accent-blue);">
+                    Proyección con Hoy: <b>${estado.metricas.gramos} g</b> (${estado.metricas.frascos} fcos) · <b>Día ${estado.metricas.dias}</b>
                 </div>
             </div>
 
-            ${estado.codigo === "LIMITE_ALCANZADO" ? `
-                <div style="background: rgba(255, 82, 82, 0.16); border: 1.5px solid var(--accent-red); color: #ff8a80; padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 800;">
-                    ${estado.motivo}
-                </div>
-            ` : ""}
+            <div id="alb-banner-estado-dinamico"></div>
 
             <div>
-                <label style="font-size: 11px; font-weight: 800; color: var(--accent-blue); text-transform: uppercase; display: block; margin-bottom: 4px;">
+                <label class="alb-label-paso" style="font-size: 11px; font-weight: 900; color: var(--accent-blue); text-transform: uppercase; display: block; margin-bottom: 4px;">
                     1. Seleccione Diagnóstico de Indicación (Protocolo Hospital):
                 </label>
                 <select id="alb-select-diagnostico" class="login-input" style="margin: 0; width: 100%; padding: 8px 10px; font-weight: 800; font-size: 12.5px; cursor: pointer;" onchange="window.actualizarFichaInformativaAlbumina()">
@@ -7146,30 +7231,29 @@ window.renderizarPanelModalAlbumina = function (fila) {
 
             <div id="alb-ficha-tecnica" style="background: rgba(0,0,0,0.28); border: 1px solid var(--glass-border); border-radius: 10px; padding: 10px 12px; font-size: 12px;"></div>
 
-            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; background: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: 10px; border: 1px solid var(--glass-border);">
-                <span style="font-size: 11.5px; font-weight: 800; color: var(--text-main); text-transform: uppercase;">
-                    2. ¿Cuenta con Receta SIDRA?:
+            <div class="alb-box-sidra" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; background: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: 10px; border: 1px solid var(--glass-border);">
+                <span style="font-size: 11.5px; font-weight: 900; color: var(--text-main); text-transform: uppercase;">
+                    2. ¿Cuenta con Receta SIDRA Hoy?:
                 </span>
-                <div style="display: flex; gap: 8px;">
-                    <label style="cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 6px; background: rgba(0,230,118,0.12); border: 1px solid var(--accent-green); color: var(--accent-green);">
-                        <input type="radio" name="albRecetaSidra" value="SI" ${recetaInicial === "SI" ? "checked" : ""}> SÍ
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <label class="alb-radio-si" style="cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 900; padding: 5px 10px; border-radius: 6px; background: rgba(0,230,118,0.14); border: 1.5px solid var(--accent-green); color: var(--accent-green);">
+                        <input type="radio" name="albRecetaSidra" value="SI" ${recetaInicial === "SI" ? "checked" : ""}> SÍ (Liberar Entrega)
                     </label>
-                    <label style="cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 6px; background: rgba(255,171,0,0.12); border: 1px solid #ff9800; color: #ff9800;">
-                        <input type="radio" name="albRecetaSidra" value="PENDIENTE" ${recetaInicial === "PENDIENTE" ? "checked" : ""}> PENDIENTE
+                    <label class="alb-radio-pend" style="cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 900; padding: 5px 10px; border-radius: 6px; background: rgba(255,171,0,0.15); border: 1.5px solid #ff9800; color: #ffab00;">
+                        <input type="radio" name="albRecetaSidra" value="PENDIENTE" ${recetaInicial === "PENDIENTE" ? "checked" : ""}> PENDIENTE (Enviar a QF)
                     </label>
-                    <label style="cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 6px; background: rgba(255,82,82,0.12); border: 1px solid var(--accent-red); color: var(--accent-red);">
-                        <input type="radio" name="albRecetaSidra" value="NO" ${recetaInicial === "NO" ? "checked" : ""}> NO
+                    <label class="alb-radio-no" style="cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 900; padding: 5px 10px; border-radius: 6px; background: rgba(255,82,82,0.15); border: 1.5px solid var(--accent-red); color: var(--accent-red);">
+                        <input type="radio" name="albRecetaSidra" value="NO" ${recetaInicial === "NO" ? "checked" : ""}> NO (Rechazar / S/I)
                     </label>
                 </div>
             </div>
         </div>
     `;
 
-    // Asegurar que el panel del médico esté visible y con su datalist actualizado
     const panelDoctor = document.querySelector(".modal-doctor-panel");
     if (panelDoctor) {
         panelDoctor.innerHTML = `
-            <label>3. Médico Prescriptor / Autorizador (Se guarda automáticamente si es nuevo)</label>
+            <label class="alb-label-paso">3. Médico Prescriptor / Jefe de Servicio que Autoriza (Se guarda si es nuevo)</label>
             <div class="modal-row-inputs">
                 <input type="text" id="modal-medNombre" list="medicosList" placeholder="Escriba o seleccione nombre del médico..." onchange="window.autoCompletarRut()" autocomplete="off">
                 <input type="text" id="modal-medRut" placeholder="RUT del médico">
@@ -7180,7 +7264,9 @@ window.renderizarPanelModalAlbumina = function (fila) {
 
     const inpMed = document.getElementById("modal-medNombre");
     const inpRut = document.getElementById("modal-medRut");
-    if (inpMed && (regPrevio.medico || regPrevio.medicoAutorizador)) inpMed.value = regPrevio.medico || regPrevio.medicoAutorizador;
+    if (inpMed && regPrevio.medico && regPrevio.medico !== "PENDIENTE VISACIÓN QF" && regPrevio.medico !== "SIN RECETA SIDRA") {
+        inpMed.value = regPrevio.medico;
+    }
     if (inpRut && regPrevio.rut && regPrevio.rut !== "S/R") inpRut.value = regPrevio.rut;
 
     window.configurarAutocompletadoBidireccionalMedico();
@@ -7191,6 +7277,7 @@ window.actualizarFichaInformativaAlbumina = function () {
     const sel = document.getElementById("alb-select-diagnostico");
     const inpOtro = document.getElementById("alb-input-otro-diag");
     const ficha = document.getElementById("alb-ficha-tecnica");
+    const banner = document.getElementById("alb-banner-estado-dinamico");
     if (!sel || !ficha) return;
 
     const id = sel.value;
@@ -7198,7 +7285,8 @@ window.actualizarFichaInformativaAlbumina = function () {
 
     const proto = window.CATALOGO_PROTOCOLO_ALBUMina[id] || window.CATALOGO_PROTOCOLO_ALBUMina["OTRO"];
     const fila = window.filaActivaModal;
-    const metricas = fila ? window.calcularMetricasAlbuminaFila(fila) : { frascos: 0, gramos: 0, dias: 1 };
+    const metricas = fila ? window.calcularMetricasAlbuminaFila(fila, true) : { frascos: 0, gramos: 0, dias: 1, colActiva: 0, frascosCalculadosHoy: 0 };
+    const estadoActual = fila ? window.evaluarEstadoProtocoloAlbumina(fila) : { codigo: "SIN_PROTOCOLO" };
 
     const textoMaxDosis = proto.maxGramos !== null
         ? `${proto.maxGramos} g (${proto.maxFrascos} frascos)`
@@ -7206,35 +7294,97 @@ window.actualizarFichaInformativaAlbumina = function () {
 
     const alertaGramos = (proto.maxGramos !== null && metricas.gramos > proto.maxGramos);
     const alertaDias = (proto.maxDias !== null && metricas.dias > proto.maxDias);
+    const estaFueraDeProtocolo = alertaGramos || alertaDias;
+
+    if (banner) {
+        if (estadoActual.codigo === "RECHAZADO_QF") {
+            banner.innerHTML = `
+                <div class="alb-banner-limite" style="background: rgba(255, 82, 82, 0.18); border: 2px solid var(--accent-red); color: #ff8a80; padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height: 1.45;">
+                    <div style="font-weight: 900; font-size: 13px; text-transform: uppercase; margin-bottom: 4px;">
+                        ❌ TRATAMIENTO RECHAZADO (${estadoActual.motivo})
+                    </div>
+                    <div>
+                        Si el equipo médico presentó la Receta SIDRA o el Jefe de Servicio autorizó la entrega, seleccione <b>SÍ (Liberar Entrega)</b> abajo e indique el médico para reactivar las unidades.
+                    </div>
+                    ${estaFueraDeProtocolo ? `
+                        <label style="display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(255,82,82,0.4); cursor: pointer; font-weight: 900; font-size: 12px;">
+                            <input type="checkbox" id="alb-chk-extension-jefe" style="width: 16px; height: 16px; cursor: pointer;">
+                            <span>CONFIRMO QUE CUENTA CON AUTORIZACIÓN DE EXTENSIÓN POR JEFE DE SERVICIO</span>
+                        </label>
+                    ` : ""}
+                </div>
+            `;
+        } else if (estaFueraDeProtocolo) {
+            let razones = [];
+            if (alertaDias) razones.push(`cursa el <b>Día ${metricas.dias}</b> (máximo protocolo: <b>${proto.maxDias} días</b>)`);
+            if (alertaGramos) razones.push(`acumula <b>${metricas.gramos} g / ${metricas.frascos} fcos</b> (máximo protocolo: <b>${proto.maxGramos} g / ${proto.maxFrascos} fcos</b>)`);
+
+            banner.innerHTML = `
+                <div class="alb-banner-limite" style="background: rgba(255, 82, 82, 0.18); border: 2px solid var(--accent-red); color: #ff8a80; padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height: 1.45;">
+                    <div style="font-weight: 900; font-size: 13px; text-transform: uppercase; margin-bottom: 4px;">
+                        🚨 TRATAMIENTO FUERA DE PROTOCOLO (${proto.nombre.toUpperCase()})
+                    </div>
+                    <div>
+                        El paciente ${razones.join(" y ")}. Según la guía institucional (<i>lo que se cumpla primero</i>), el despacho está <b>bloqueado</b> salvo autorización excepcional por <b>Jefe de Servicio</b>.
+                    </div>
+                    <label style="display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(255,82,82,0.4); cursor: pointer; font-weight: 900; font-size: 12px;">
+                        <input type="checkbox" id="alb-chk-extension-jefe" style="width: 16px; height: 16px; cursor: pointer;">
+                        <span>CONFIRMO QUE CUENTA CON AUTORIZACIÓN DE EXTENSIÓN POR JEFE DE SERVICIO</span>
+                    </label>
+                </div>
+            `;
+        } else {
+            banner.innerHTML = `
+                <div class="alb-banner-dia" style="background: rgba(64, 196, 255, 0.14); border: 1.5px solid var(--accent-blue); color: var(--text-main); padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 700;">
+                    📅 <b>Validación Diaria Requerida (Columna Día ${metricas.colActiva + 1} · Día ${metricas.dias} de tratamiento):</b> Confirme la Receta SIDRA y el médico prescriptor para liberar las <b>${metricas.frascosCalculadosHoy} unidades</b> de hoy.
+                </div>
+            `;
+        }
+    }
+
+    const badgeTipo = document.getElementById("modal-badge-tipo");
+    const btnAceptar = document.getElementById("btn-aceptar-dosis");
+    if (badgeTipo) {
+        badgeTipo.innerText = estadoActual.codigo === "RECHAZADO_QF"
+            ? "❌ RECHAZADO (REVISIÓN)"
+            : (estaFueraDeProtocolo ? "🚨 FUERA DE PROTOCOLO (LÍMITE SUPERADO)" : `VALIDACIÓN DÍA ${metricas.dias}`);
+        badgeTipo.style.background = (estaFueraDeProtocolo || estadoActual.codigo === "RECHAZADO_QF") ? "var(--accent-red)" : "#ff9800";
+        badgeTipo.style.color = "#fff";
+    }
+    if (btnAceptar) {
+        btnAceptar.innerText = estaFueraDeProtocolo
+            ? "AUTORIZAR EXTENSIÓN (JEFE DE SERVICIO)"
+            : "REGISTRAR PROTOCOLO ALBÚMINA";
+    }
 
     ficha.innerHTML = `
         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 8px;">
-            <div style="background: rgba(255,255,255,0.04); padding: 6px 8px; border-radius: 6px; border-left: 3px solid var(--accent-blue);">
-                <div style="font-size: 10px; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">Dosis Albúmina / Día</div>
+            <div class="alb-card-item" style="background: rgba(255,255,255,0.05); padding: 7px 9px; border-radius: 6px; border-left: 3.5px solid var(--accent-blue);">
+                <div class="alb-txt-secundario" style="font-size: 10px; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">Dosis Albúmina / Día</div>
                 <div style="font-weight: 800; color: var(--text-main); margin-top: 2px; font-size: 11.5px;">${proto.dosisDia}</div>
             </div>
-            <div style="background: rgba(255,255,255,0.04); padding: 6px 8px; border-radius: 6px; border-left: 3px solid ${alertaGramos ? 'var(--accent-red)' : 'var(--accent-green)'};">
-                <div style="font-size: 10px; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">Dosis Máx. Paciente</div>
-                <div style="font-weight: 900; color: ${alertaGramos ? 'var(--accent-red)' : 'var(--accent-green)'}; margin-top: 2px; font-size: 12px;">
+            <div class="alb-card-item" style="background: rgba(255,255,255,0.05); padding: 7px 9px; border-radius: 6px; border-left: 3.5px solid ${alertaGramos ? 'var(--accent-red)' : 'var(--accent-green)'};">
+                <div class="alb-txt-secundario" style="font-size: 10px; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">Dosis Máx. Paciente</div>
+                <div class="${alertaGramos ? 'alb-txt-peligro' : 'alb-txt-ok'}" style="font-weight: 900; color: ${alertaGramos ? 'var(--accent-red)' : 'var(--accent-green)'}; margin-top: 2px; font-size: 12px;">
                     ${textoMaxDosis}
                 </div>
-                <div style="font-size: 10px; color: var(--text-muted);">Actual: ${metricas.gramos} g (${metricas.frascos} fcos)</div>
+                <div class="alb-txt-secundario" style="font-size: 10.5px; color: var(--text-muted);">Proyectado: <b>${metricas.gramos} g (${metricas.frascos} fcos)</b></div>
             </div>
-            <div style="background: rgba(255,255,255,0.04); padding: 6px 8px; border-radius: 6px; border-left: 3px solid ${alertaDias ? 'var(--accent-red)' : '#ff9800'};">
-                <div style="font-size: 10px; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">Duración Máxima</div>
-                <div style="font-weight: 900; color: ${alertaDias ? 'var(--accent-red)' : 'var(--text-main)'}; margin-top: 2px; font-size: 12px;">
-                    ${proto.textoDuracion}
+            <div class="alb-card-item" style="background: rgba(255,255,255,0.05); padding: 7px 9px; border-radius: 6px; border-left: 3.5px solid ${alertaDias ? 'var(--accent-red)' : '#ff9800'};">
+                <div class="alb-txt-secundario" style="font-size: 10px; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">Duración Máxima</div>
+                <div class="${alertaDias ? 'alb-txt-peligro' : ''}" style="font-weight: 900; color: ${alertaDias ? 'var(--accent-red)' : 'var(--text-main)'}; margin-top: 2px; font-size: 12px;">
+                    ${proto.textoDuracion} ${alertaDias ? `(Actual: Día ${metricas.dias})` : ''}
                 </div>
-                <div style="font-size: 10px; color: var(--text-muted);">Regla: Lo que se cumpla primero</div>
+                <div class="alb-txt-secundario" style="font-size: 10.5px; color: var(--text-muted);">Regla: Lo que se cumpla primero</div>
             </div>
         </div>
-        <div style="font-size: 11.5px; color: var(--text-muted); border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 6px;">
-            <b style="color: #ff9800;">Consideraciones Clínicas:</b> ${proto.consideraciones}
+        <div class="alb-txt-secundario" style="font-size: 11.5px; color: var(--text-muted); border-top: 1px dashed var(--glass-border); padding-top: 6px;">
+            <b class="alb-subtitulo-guia" style="color: #ffab00;">Consideraciones Clínicas:</b> ${proto.consideraciones}
         </div>
     `;
 };
 
-// 5. Función para aplicar el estado visual y abrir el modal de Albúmina
+// 5. Aplicar el estado visual en la grilla y preservar el estado RECHAZADO en el Panel de Control derecho
 window.aplicarProtocoloAlbuminaEnGrilla = function (filaRecienEditada = null) {
     const filas = document.querySelectorAll("#grillaFila tr");
     filas.forEach(fila => {
@@ -7246,10 +7396,15 @@ window.aplicarProtocoloAlbuminaEnGrilla = function (filaRecienEditada = null) {
         const medNorm = window.quitarTildes(medNombre.toLowerCase());
         if (!medNorm.includes("albumina")) return;
 
+        const rowId = fila.dataset.row;
+        const firmaAlb = `${rowId}|${medNombre.toLowerCase()}`;
         const celdaResultado = inputs[4];
+        const contenedorAlerta = fila.querySelector(".mensaje-reaccion");
         const estadoAlb = window.evaluarEstadoProtocoloAlbumina(fila);
 
         if (estadoAlb.cumple) {
+            window.sincronizarUnidadesDiaActivoAlbumina(fila, "LIBERAR");
+
             celdaResultado.classList.remove("alerta-interaccion", "alerta-sobredosis");
             celdaResultado.value = estadoAlb.etiquetaBoton;
             celdaResultado.style.color = "var(--accent-green)";
@@ -7257,14 +7412,55 @@ window.aplicarProtocoloAlbuminaEnGrilla = function (filaRecienEditada = null) {
             celdaResultado.style.cursor = "pointer";
             celdaResultado.title = `${estadoAlb.motivo} (Clic para ver o editar protocolo de Albúmina)`;
             celdaResultado.onclick = () => window.abrirModalProtocoloAlbumina(fila, medNombre);
+            if (contenedorAlerta) contenedorAlerta.style.display = "none";
+
+            if (window.medicamentosPendientes[firmaAlb]) {
+                window.medicamentosPendientes[firmaAlb].estado = "ACEPTADO";
+            }
         } else {
-            celdaResultado.classList.add("alerta-interaccion");
+            const esRechazado = (estadoAlb.codigo === "RECHAZADO_QF");
+            const esLimiteCritico = (estadoAlb.codigo === "LIMITE_ALCANZADO" || esRechazado);
+
+            window.sincronizarUnidadesDiaActivoAlbumina(fila, esRechazado ? "RECHAZADO" : "BLOQUEAR");
+
+            celdaResultado.classList.remove("alerta-interaccion", "alerta-sobredosis");
+            celdaResultado.classList.add(esLimiteCritico ? "alerta-sobredosis" : "alerta-interaccion");
             celdaResultado.value = estadoAlb.etiquetaBoton;
-            celdaResultado.style.color = estadoAlb.codigo === "LIMITE_ALCANZADO" ? "var(--accent-red)" : "#ff9800";
+            celdaResultado.style.color = esLimiteCritico ? "var(--accent-red)" : "#ff9800";
             celdaResultado.style.fontWeight = "900";
             celdaResultado.style.cursor = "pointer";
-            celdaResultado.title = `${estadoAlb.motivo} (Clic para gestionar protocolo de Albúmina)`;
+            celdaResultado.title = `${estadoAlb.motivo} (Clic para resolver protocolo de Albúmina)`;
             celdaResultado.onclick = () => window.abrirModalProtocoloAlbumina(fila, medNombre);
+
+            if (contenedorAlerta && estadoAlb.codigo === "LIMITE_ALCANZADO") {
+                contenedorAlerta.innerHTML = `🚨 FUERA DE PROTOCOLO: Día ${estadoAlb.metricas.dias} (${estadoAlb.metricas.gramos} g). Requiere extensión Jefe Servicio.`;
+                contenedorAlerta.style.background = "#d93025";
+                contenedorAlerta.style.display = "block";
+            } else if (contenedorAlerta && esRechazado) {
+                contenedorAlerta.innerHTML = `❌ RECHAZADO: ${estadoAlb.motivo}`;
+                contenedorAlerta.style.background = "#d93025";
+                contenedorAlerta.style.display = "block";
+            }
+
+            if (!window.medicamentosPendientes[firmaAlb]) {
+                window.medicamentosPendientes[firmaAlb] = {
+                    rowId,
+                    medicamento: medNombre.toLowerCase(),
+                    tipo: "ALBUMINA",
+                    esProtocoloAlbumina: true
+                };
+            }
+
+            // Respetar el estado RECHAZADO para que en el Panel de Control derecho aparezca en ROJO con el botón RESOLVER activo
+            if (esRechazado) {
+                window.medicamentosPendientes[firmaAlb].estado = "RECHAZADO";
+                window.medicamentosPendientes[firmaAlb].observacionQF = window.medicamentosPendientes[firmaAlb].observacionQF || "Sin autorización / Sin Receta SIDRA";
+            } else {
+                window.medicamentosPendientes[firmaAlb].estado = "PENDIENTE";
+                window.medicamentosPendientes[firmaAlb].especialidad = estadoAlb.codigo === "LIMITE_ALCANZADO"
+                    ? `🚨 LÍMITE SUPERADO (Día ${estadoAlb.metricas.dias} · ${estadoAlb.metricas.gramos}g)`
+                    : `Validar Receta SIDRA (Día ${estadoAlb.metricas.dias})`;
+            }
 
             if (!window.isCargandoPerfil && filaRecienEditada && filaRecienEditada === fila) {
                 window.abrirModalProtocoloAlbumina(fila, medNombre);
@@ -7273,15 +7469,104 @@ window.aplicarProtocoloAlbuminaEnGrilla = function (filaRecienEditada = null) {
     });
 };
 
+const _mostrarModalRestringidoOriginal = window.mostrarModalRestringido;
+window.mostrarModalRestringido = function (firma) {
+    const partes = (firma || "").split("|");
+    const rowId = partes[0];
+    const medKey = partes[1] || "";
+    const data = window.medicamentosPendientes?.[firma];
+
+    if (medKey.includes("albumina") || medKey.includes("albúmina") || data?.esProtocoloAlbumina || data?.tipo === "ALBUMINA") {
+        const filaUI = document.querySelector(`#grillaFila tr[data-row="${rowId}"]`);
+        if (filaUI) {
+            const medNombreReal = filaUI.querySelectorAll("input")[0]?.value.trim() || data?.medicamento || "Albúmina Humana 20%";
+            window.abrirModalProtocoloAlbumina(filaUI, medNombreReal);
+            return;
+        }
+    }
+
+    if (typeof _mostrarModalRestringidoOriginal === "function") {
+        _mostrarModalRestringidoOriginal(firma);
+    }
+};
+
+const _aplicarResolucionQFOriginal = window.aplicarResolucionQFEnCamaAbierta;
+window.aplicarResolucionQFEnCamaAbierta = function (sol) {
+    const medNorm = window.quitarTildes((sol.medicamento || "").toLowerCase());
+    if (medNorm.includes("albumina")) {
+        const firmaAlb = sol.firmaOriginal || `${sol.rowId}|${sol.medicamento.toLowerCase()}`;
+        const colActiva = window.obtenerColumnaDiaActivaGrilla();
+        const prev = window.medicamentosPendientes?.[firmaAlb] || window.autorizacionesPorFila?.[sol.rowId] || {};
+
+        const actualizado = {
+            ...prev,
+            estado: sol.estado, // "ACEPTADO" o "RECHAZADO"
+            rowId: sol.rowId,
+            medicamento: sol.medicamento.toLowerCase(),
+            tipo: "ALBUMINA",
+            esProtocoloAlbumina: true,
+            diagnosticoId: prev.diagnosticoId || "SHOCK_SEPTICO",
+            diagnosticoNombre: prev.diagnosticoNombre || "Protocolo Albúmina",
+            recetaSidra: sol.estado === "ACEPTADO" ? "SI" : "NO",
+            colDiaAutorizado: colActiva,
+            medico: sol.medicoAutorizador || prev.medico || "QF",
+            medicoAutorizador: sol.medicoAutorizador || prev.medicoAutorizador || "QF",
+            observacionQF: sol.observacionQF || (sol.estado === "RECHAZADO" ? "No autorizado por QF" : ""),
+            extensionJefeAutorizada: sol.estado === "ACEPTADO" ? true : false,
+            gramosAutorizadosExtension: 9999,
+            diasAutorizadosExtension: 999
+        };
+
+        window.autorizacionesPorFila[sol.rowId] = actualizado;
+        window.medicamentosPendientes[firmaAlb] = actualizado;
+
+        let idCamaFallback = sol.idCamaDoc || ((document.getElementById("servicio")?.value || "sin") + "_" + (document.getElementById("cama")?.value || "sincama")).toLowerCase().replace(/\s+/g, '_');
+        let llaveLocal = window.obtenerLlaveMaestraPaciente ? window.obtenerLlaveMaestraPaciente() : idCamaFallback;
+        localStorage.setItem("pendientes_" + llaveLocal, JSON.stringify(window.medicamentosPendientes));
+        localStorage.setItem("pendientes_" + idCamaFallback, JSON.stringify(window.medicamentosPendientes));
+
+        window.aplicarProtocoloAlbuminaEnGrilla();
+        window.actualizarSidebarPendientes();
+        window.programarAutoguardado();
+        return;
+    }
+
+    if (typeof _aplicarResolucionQFOriginal === "function") {
+        _aplicarResolucionQFOriginal(sol);
+    }
+};
+
 const _escanearRestringidosBase = window.escanearRestringidos;
 window.escanearRestringidos = function (filaEditada = null) {
+    const respaldoAlbumina = {};
+    if (window.medicamentosPendientes) {
+        for (let k in window.medicamentosPendientes) {
+            if (k.includes("albumina") || k.includes("albúmina") || window.medicamentosPendientes[k]?.esProtocoloAlbumina || window.medicamentosPendientes[k]?.tipo === "ALBUMINA") {
+                respaldoAlbumina[k] = window.medicamentosPendientes[k];
+            }
+        }
+    }
+
     if (typeof _escanearRestringidosBase === "function") {
         try { _escanearRestringidosBase(filaEditada); } catch (e) { console.warn(e); }
     }
+
+    document.querySelectorAll("#grillaFila tr").forEach(f => {
+        const rId = f.dataset.row;
+        const mTxt = (f.querySelectorAll("input")[0]?.value || "").trim().toLowerCase();
+        if (mTxt.includes("albumina") || mTxt.includes("albúmina")) {
+            const key = `${rId}|${mTxt}`;
+            if (respaldoAlbumina[key]) {
+                window.medicamentosPendientes[key] = respaldoAlbumina[key];
+                window.autorizacionesPorFila[rId] = respaldoAlbumina[key];
+            }
+        }
+    });
+
     window.aplicarProtocoloAlbuminaEnGrilla(filaEditada);
+    window.actualizarSidebarPendientes();
 };
 
-// Escuchador directo en la grilla: cuando se edite una fila con Albúmina, lanza el modal automáticamente
 document.getElementById("grillaFila")?.addEventListener("change", function (e) {
     const input = e.target;
     if (!input || input.tagName !== "INPUT") return;
@@ -7297,6 +7582,7 @@ document.getElementById("grillaFila")?.addEventListener("change", function (e) {
     if (medNorm.includes("albumina") && posoTexto !== "") {
         setTimeout(() => {
             window.aplicarProtocoloAlbuminaEnGrilla(fila);
+            window.actualizarSidebarPendientes();
         }, 60);
     }
 });
@@ -7307,27 +7593,29 @@ window.abrirModalProtocoloAlbumina = function (fila, medNombre) {
     const estadoAlb = window.evaluarEstadoProtocoloAlbumina(fila);
 
     const tituloPrincipal = document.getElementById("modal-titulo-principal");
-    const badgeTipo = document.getElementById("modal-badge-tipo");
     const iconoHeader = document.querySelector("#modal-overlay .modal-header .material-icons-round");
 
     if (tituloPrincipal) tituloPrincipal.innerText = "PROTOCOLO ALBÚMINA HUMANA";
-    if (badgeTipo) {
-        badgeTipo.innerText = estadoAlb.codigo === "LIMITE_ALCANZADO" ? "LÍMITE SUPERADO" : "DIAGNÓSTICO + SIDRA";
-        badgeTipo.style.background = estadoAlb.codigo === "LIMITE_ALCANZADO" ? "var(--accent-red)" : "#ff9800";
-        badgeTipo.style.color = "#fff";
-    }
     if (iconoHeader) {
-        iconoHeader.textContent = "verified_user";
-        iconoHeader.style.color = estadoAlb.codigo === "LIMITE_ALCANZADO" ? "var(--accent-red)" : "#ff9800";
+        iconoHeader.textContent = (estadoAlb.codigo === "LIMITE_ALCANZADO" || estadoAlb.codigo === "RECHAZADO_QF") ? "report" : "verified_user";
+        iconoHeader.style.color = (estadoAlb.codigo === "LIMITE_ALCANZADO" || estadoAlb.codigo === "RECHAZADO_QF") ? "var(--accent-red)" : "#ff9800";
     }
 
     window.renderizarPanelModalAlbumina(fila);
 
-    // Ocultar botón secundario de dejar pendiente para que todo se controle con los radios SÍ/PENDIENTE/NO
     const btnPendiente = document.getElementById("btn-dejar-pendiente");
     if (btnPendiente) btnPendiente.style.display = "none";
 
-    // Mostrar el overlay con display: flex (indispensable en tu CSS)
+    const btnCerrar = document.querySelector("#modal-overlay .modal-actions .btn-entendido:last-child");
+    if (btnCerrar) {
+        btnCerrar.onclick = function () {
+            window.resetearCerrarModal();
+            window.aplicarProtocoloAlbuminaEnGrilla(null);
+            window.actualizarSidebarPendientes();
+            window.programarAutoguardado();
+        };
+    }
+
     const overlay = document.getElementById("modal-overlay");
     if (overlay) {
         overlay.style.display = "flex";
@@ -7337,10 +7625,6 @@ window.abrirModalProtocoloAlbumina = function (fila, medNombre) {
 
     const btnAceptar = document.getElementById("btn-aceptar-dosis");
     if (btnAceptar) {
-        btnAceptar.innerText = estadoAlb.codigo === "LIMITE_ALCANZADO"
-            ? "AUTORIZAR EXTENSIÓN (JEFE SERVICIO)"
-            : "REGISTRAR PROTOCOLO ALBÚMINA";
-
         btnAceptar.onclick = async function () {
             const diagId = document.getElementById("alb-select-diagnostico")?.value || "SHOCK_SEPTICO";
             const otroTxt = (document.getElementById("alb-input-otro-diag")?.value || "").trim();
@@ -7355,27 +7639,40 @@ window.abrirModalProtocoloAlbumina = function (fila, medNombre) {
                 return;
             }
 
-            if (!nombreMedAutoriza) {
-                alert("⚠️ Ingrese el Nombre del Médico prescriptor / autorizador.");
-                return;
-            }
-
-            await window.guardarMedicoNuevoSiNoExiste(nombreMedAutoriza, rutMedAutoriza);
-
-            const rowId = fila.dataset.row;
-            const metricasHoy = window.calcularMetricasAlbuminaFila(fila);
+            const metricasHoy = window.calcularMetricasAlbuminaFila(fila, true);
             const proto = window.CATALOGO_PROTOCOLO_ALBUMina[diagId] || window.CATALOGO_PROTOCOLO_ALBUMina["OTRO"];
             const excedeHoy = (proto.maxGramos !== null && metricasHoy.gramos > proto.maxGramos) ||
                               (proto.maxDias !== null && metricasHoy.dias > proto.maxDias);
 
+            const chkExtension = document.getElementById("alb-chk-extension-jefe");
+            if (recetaVal === "SI" && excedeHoy && chkExtension && !chkExtension.checked) {
+                alert("🚨 TRATAMIENTO FUERA DE PROTOCOLO:\n\nEl paciente ya superó el límite de días o dosis máxima estipulada para este diagnóstico.\n\nPara liberar unidades adicionales debe marcar la casilla confirmando la Autorización por Jefe de Servicio (o elegir PENDIENTE / NO).");
+                return;
+            }
+
+            if (recetaVal === "SI" && !nombreMedAutoriza) {
+                alert("⚠️ Para liberar la entrega de Albúmina (Receta SIDRA: SÍ), ingrese el Nombre del Médico prescriptor / Jefe de Servicio.");
+                return;
+            }
+
+            if (nombreMedAutoriza) {
+                await window.guardarMedicoNuevoSiNoExiste(nombreMedAutoriza, rutMedAutoriza);
+            }
+
+            const rowId = fila.dataset.row;
+            const colActivaHoy = window.obtenerColumnaDiaActivaGrilla();
             const nombreDiagFinal = diagId === "OTRO" ? otroTxt : proto.nombre;
             const firmaAlb = `${rowId}|${medNombre.toLowerCase()}`;
+            const medicoFinal = nombreMedAutoriza ? nombreMedAutoriza.toUpperCase() : (recetaVal === "NO" ? "SIN RECETA SIDRA" : "PENDIENTE VISACIÓN QF");
+
+            // Si marca "SI" -> ACEPTADO | Si marca "PENDIENTE" -> PENDIENTE | Si marca "NO" -> RECHAZADO (con botón RESOLVER en rojo)
+            const estadoCalculado = (recetaVal === "SI") ? "ACEPTADO" : (recetaVal === "NO" ? "RECHAZADO" : "PENDIENTE");
 
             const datosRegistro = {
-                estado: (recetaVal === "SI") ? "ACEPTADO" : "PENDIENTE",
+                estado: estadoCalculado,
                 rowId,
                 medicamento: medNombre.toLowerCase(),
-                especialidad: `Albúmina (${nombreDiagFinal} · Receta: ${recetaVal})`,
+                especialidad: `Albúmina (${nombreDiagFinal} · SIDRA: ${recetaVal} · Día ${metricasHoy.dias})`,
                 medicos: [],
                 tipo: "ALBUMINA",
                 esProtocoloAlbumina: true,
@@ -7383,31 +7680,350 @@ window.abrirModalProtocoloAlbumina = function (fila, medNombre) {
                 diagnosticoNombre: nombreDiagFinal,
                 diagnosticoOtroTexto: otroTxt,
                 recetaSidra: recetaVal,
-                medico: nombreMedAutoriza.toUpperCase(),
-                medicoAutorizador: `${nombreMedAutoriza.toUpperCase()} (${nombreDiagFinal})`,
+                colDiaAutorizado: colActivaHoy,
+                medico: medicoFinal,
+                medicoAutorizador: `${medicoFinal} (${nombreDiagFinal}${excedeHoy ? ' · EXT. JEFE' : ''})`,
+                observacionQF: estadoCalculado === "RECHAZADO" ? `Rechazado / Sin Receta SIDRA (${nombreDiagFinal})` : "",
                 rut: rutMedAutoriza || "S/R",
                 fecha: new Date().toLocaleDateString('es-CL'),
-                extensionJefeAutorizada: excedeHoy,
-                gramosAutorizadosExtension: excedeHoy ? metricasHoy.gramos : (proto.maxGramos || 9999),
-                diasAutorizadosExtension: excedeHoy ? metricasHoy.dias : (proto.maxDias || 999)
+                extensionJefeAutorizada: (recetaVal === "SI" && excedeHoy) ? true : false,
+                gramosAutorizadosExtension: (recetaVal === "SI" && excedeHoy) ? metricasHoy.gramos : (proto.maxGramos || 9999),
+                diasAutorizadosExtension: (recetaVal === "SI" && excedeHoy) ? metricasHoy.dias : (proto.maxDias || 999)
             };
 
             window.autorizacionesPorFila[rowId] = datosRegistro;
             window.medicamentosPendientes[firmaAlb] = datosRegistro;
 
-            let llaveLocal = window.obtenerLlaveMaestraPaciente ? window.obtenerLlaveMaestraPaciente() : "sin_rut";
+            let idCamaFallback = ((document.getElementById("servicio")?.value || "sin") + "_" + (document.getElementById("cama")?.value || "sincama")).toLowerCase().replace(/\s+/g, '_');
+            let llaveLocal = window.obtenerLlaveMaestraPaciente ? window.obtenerLlaveMaestraPaciente() : idCamaFallback;
             localStorage.setItem("pendientes_" + llaveLocal, JSON.stringify(window.medicamentosPendientes));
+            localStorage.setItem("pendientes_" + idCamaFallback, JSON.stringify(window.medicamentosPendientes));
 
-            if (recetaVal !== "SI" && typeof window.enviarSolicitudVisacionQF === "function") {
+            if (recetaVal === "PENDIENTE" && typeof window.enviarSolicitudVisacionQF === "function") {
                 await window.enviarSolicitudVisacionQF(firmaAlb);
-            } else if (typeof window.limpiarSolicitudVisacionPorResolucionLocal === "function") {
+            } else if ((recetaVal === "SI" || recetaVal === "NO") && typeof window.limpiarSolicitudVisacionPorResolucionLocal === "function") {
                 window.limpiarSolicitudVisacionPorResolucionLocal(rowId, medNombre);
             }
 
             window.resetearCerrarModal();
-            window.aplicarProtocoloAlbuminaEnGrilla();
+            window.aplicarProtocoloAlbuminaEnGrilla(null);
             window.actualizarSidebarPendientes();
             if (typeof window.programarAutoguardado === "function") window.programarAutoguardado();
         };
     }
 };
+
+// ============================================================================
+// 21. PIZARRA DE INFO CLÍNICA EN TIEMPO REAL (EXCLUSIVO QUÍMICO FARMACÉUTICO)
+// ============================================================================
+window.avisosClinicosCache = [];
+
+window.esUsuarioRolQF = function () {
+    const sesion = JSON.parse(sessionStorage.getItem("FarmaPerfil_Sesion") || "{}");
+    return sesion && sesion.rol === "Químico Farmacéutico";
+};
+
+window.iniciarPizarraInfoClinicaTiempoReal = function () {
+    const divListaAvisos = document.getElementById("lista-avisos");
+    if (!divListaAvisos || !window.db) return;
+
+    // 1. Inyectar botón "+ PUBLICAR QF" en la cabecera del panel INFO CLÍNICA
+    const h3Cabecera = divListaAvisos.parentElement?.querySelector("h3");
+    if (h3Cabecera && !document.getElementById("btn-gestionar-info-qf")) {
+        h3Cabecera.style.justifyContent = "space-between";
+        const spanTitulo = document.createElement("span");
+        spanTitulo.style.cssText = "display:flex; align-items:center; gap:10px;";
+        spanTitulo.innerHTML = `<span class="material-icons-round" style="background: rgba(64,196,255,0.1); padding: 8px; border-radius: 10px;">campaign</span> INFO CLÍNICA`;
+
+        const btnGestionQF = document.createElement("button");
+        btnGestionQF.id = "btn-gestionar-info-qf";
+        btnGestionQF.type = "button";
+        btnGestionQF.onclick = () => window.abrirModalGestionInfoClinicaQF();
+        btnGestionQF.style.cssText = "display: none; background: rgba(0, 230, 118, 0.15); color: var(--accent-green); border: 1px solid var(--accent-green); border-radius: 8px; padding: 5px 10px; font-size: 10.5px; font-weight: 900; cursor: pointer; align-items: center; gap: 4px; transition: 0.2s;";
+        btnGestionQF.innerHTML = `<span class="material-icons-round" style="font-size: 14px;">edit_note</span> PUBLICAR QF`;
+
+        h3Cabecera.innerHTML = "";
+        h3Cabecera.appendChild(spanTitulo);
+        h3Cabecera.appendChild(btnGestionQF);
+    }
+
+    // 2. Agregar botón de Pizarra QF en la cabecera superior y desplazar suavemente .user-info-header para que NUNCA se superpongan
+    const titleCell = document.querySelector(".header-cell.title-cell");
+    if (titleCell && !document.getElementById("btnPizarraQFHeader")) {
+        const btnHeaderQF = document.createElement("button");
+        btnHeaderQF.id = "btnPizarraQFHeader";
+        btnHeaderQF.className = "theme-toggle-btn";
+        btnHeaderQF.style.cssText = "right: 150px; display: none;";
+        btnHeaderQF.title = "Publicar Novedad en Info Clínica (Exclusivo QF)";
+        btnHeaderQF.onclick = () => window.abrirModalGestionInfoClinicaQF();
+        btnHeaderQF.innerHTML = `<span class="material-icons-round" style="color: var(--accent-blue);">campaign</span>`;
+        titleCell.appendChild(btnHeaderQF);
+    }
+
+    window.actualizarVisibilidadBotonesInfoQF();
+
+    // 3. Escuchar en tiempo real la colección config_maestra/pizarra_avisos
+    onSnapshot(doc(window.db, "config_maestra", "pizarra_avisos"), (docSnap) => {
+        if (docSnap.exists() && Array.isArray(docSnap.data().mensajes)) {
+            window.avisosClinicosCache = docSnap.data().mensajes;
+        } else {
+            window.avisosClinicosCache = [];
+        }
+        window.renderizarTarjetasInfoClinica();
+        window.renderizarListaModalInfoClinicaQF();
+    });
+};
+
+window.actualizarVisibilidadBotonesInfoQF = function () {
+    const esQF = window.esUsuarioRolQF();
+    const btnPortada = document.getElementById("btn-gestionar-info-qf");
+    const btnHeader = document.getElementById("btnPizarraQFHeader");
+    const userInfoHeader = document.querySelector(".user-info-header");
+
+    if (btnPortada) btnPortada.style.display = esQF ? "inline-flex" : "none";
+    if (btnHeader) btnHeader.style.display = esQF ? "flex" : "none";
+
+    // Correr el bloque del nombre de usuario a 198px cuando hay 4 botones para que jamás se pisen
+    if (userInfoHeader) {
+        userInfoHeader.style.right = esQF ? "198px" : "150px";
+    }
+};
+
+window.renderizarTarjetasInfoClinica = function () {
+    const divAvisos = document.getElementById("lista-avisos");
+    if (!divAvisos) return;
+
+    const esQF = window.esUsuarioRolQF();
+    const mensajes = window.avisosClinicosCache || [];
+
+    if (mensajes.length === 0) {
+        divAvisos.innerHTML = `
+            <div style="color: var(--text-muted); font-size: 13px; text-align: center; margin-top: 30px; line-height: 1.6;">
+                <span class="material-icons-round" style="font-size: 36px; display: block; margin-bottom: 8px; opacity: 0.35;">mark_chat_read</span>
+                No hay avisos activos en Farmacia.
+                ${esQF ? `<br><button type="button" onclick="window.abrirModalGestionInfoClinicaQF()" style="margin-top: 12px; background: rgba(64,196,255,0.12); color: var(--accent-blue); border: 1px dashed var(--accent-blue); border-radius: 8px; padding: 6px 12px; font-size: 11px; font-weight: 800; cursor: pointer;">+ Publicar primera novedad del turno</button>` : ""}
+            </div>`;
+        return;
+    }
+
+    divAvisos.innerHTML = mensajes.map((item, idx) => {
+        const esObjeto = typeof item === "object" && item !== null;
+        const textoRaw = esObjeto ? (item.texto || "") : String(item);
+        const autor = esObjeto ? (item.autor || "QF Farmacia") : "";
+        const fecha = esObjeto ? (item.fecha || "") : "";
+        const nivel = esObjeto ? (item.nivel || "INFO") : (
+            (textoRaw.includes("🚨") || textoRaw.includes("❌") || textoRaw.toLowerCase().includes("quiebre") || textoRaw.toLowerCase().includes("urgente"))
+                ? "URGENTE"
+                : (textoRaw.includes("⚠️") ? "IMPORTANTE" : "INFO")
+        );
+
+        let color = "var(--accent-blue)";
+        let bg = "rgba(64,196,255,0.12)";
+        let icon = "info";
+        let etiqueta = "NOVEDAD DE TURNO";
+
+        if (nivel === "URGENTE") {
+            color = "var(--accent-red)";
+            bg = "rgba(255,82,82,0.14)";
+            icon = "report";
+            etiqueta = "URGENTE / QUIEBRE";
+        } else if (nivel === "IMPORTANTE") {
+            color = "#d97706";
+            bg = "rgba(255,152,0,0.14)";
+            icon = "warning";
+            etiqueta = "AVISO IMPORTANTE";
+        }
+
+        const textoLimpio = textoRaw.replace(/⚠️|❌|🚨|✅|💡/g, "").trim();
+
+        return `
+            <div style="background: var(--panel-bg); border: 1px solid var(--glass-border); border-left: 5px solid ${color}; padding: 12px 14px; border-radius: 12px; display: flex; gap: 12px; align-items: flex-start; box-shadow: 0 6px 16px rgba(0,0,0,0.12); position: relative;">
+                <span class="material-icons-round" style="color: ${color}; font-size: 22px; background: ${bg}; padding: 6px; border-radius: 8px;">${icon}</span>
+                <div style="flex: 1; min-width: 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 3px;">
+                        <span style="font-size: 10px; font-weight: 900; color: ${color}; text-transform: uppercase; letter-spacing: 0.5px;">${etiqueta}</span>
+                        ${esQF ? `<button type="button" onclick="window.eliminarAvisoInfoClinicaQF(${idx})" title="Eliminar este aviso" style="background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0; font-size: 15px; line-height: 1;">×</button>` : ""}
+                    </div>
+                    <div style="font-size: 12.5px; color: var(--text-main); line-height: 1.45; font-weight: 600; word-wrap: break-word;">${textoLimpio}</div>
+                    ${(autor || fecha) ? `<div style="font-size: 10px; color: var(--text-muted); margin-top: 6px; font-weight: 700;">👨‍⚕️ QF ${autor} ${fecha ? `· ${fecha}` : ""}</div>` : ""}
+                </div>
+            </div>
+        `;
+    }).join("");
+};
+
+window.abrirModalGestionInfoClinicaQF = function () {
+    if (!window.esUsuarioRolQF()) {
+        alert("🔒 ACCESO EXCLUSIVO\n\nSolo los profesionales con rol Químico Farmacéutico pueden publicar o modificar las novedades de Info Clínica.");
+        return;
+    }
+
+    let modal = document.getElementById("modal-info-clinica-qf");
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "modal-info-clinica-qf";
+        modal.className = "modal-overlay";
+        modal.style.cssText = "z-index: 99999999; display: none;";
+        modal.innerHTML = `
+            <div class="modal-container" style="width: 650px; max-width: 95vw; max-height: 90vh; display: flex; flex-direction: column;">
+                <div class="modal-header" style="justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-border); padding-bottom: 12px;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span class="material-icons-round icon" style="color: var(--accent-blue); font-size: 36px; background: rgba(64,196,255,0.12); padding: 10px; border-radius: 50%;">campaign</span>
+                        <div>
+                            <div style="font-size: 18px; font-weight: 900; color: var(--text-main); text-transform: uppercase;">
+                                PIZARRA DE NOVEDADES CLÍNICAS (QF)
+                            </div>
+                            <div style="color: var(--text-muted); font-size: 12px; margin-top: 2px;">
+                                Publique quiebres de stock, cambios de protocolo o avisos de turno visibles para todo el hospital.
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" onclick="window.cerrarModalGestionInfoClinicaQF()" style="background: rgba(255,82,82,0.15); color: var(--accent-red); border: none; border-radius: 50%; width: 34px; height: 34px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                        <span class="material-icons-round">close</span>
+                    </button>
+                </div>
+
+                <div class="qf-form-box" style="background: rgba(0,0,0,0.18); border: 1px solid var(--glass-border); border-radius: 12px; padding: 14px; margin-top: 12px;">
+                    <label class="qf-lbl-paso" style="font-size: 11px; font-weight: 800; color: var(--accent-blue); text-transform: uppercase; display: block; margin-bottom: 6px;">
+                        1. Nivel de Prioridad del Aviso:
+                    </label>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px;">
+                        <label class="qf-radio-info" style="cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 8px; border-radius: 8px; border: 1.5px solid var(--accent-blue); background: rgba(64,196,255,0.12); color: var(--accent-blue); font-size: 11.5px; font-weight: 900;">
+                            <input type="radio" name="qfNivelAviso" value="INFO" checked> 💡 INFORMATIVO
+                        </label>
+                        <label class="qf-radio-imp" style="cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 8px; border-radius: 8px; border: 1.5px solid #ff9800; background: rgba(255,152,0,0.12); color: #ffab00; font-size: 11.5px; font-weight: 900;">
+                            <input type="radio" name="qfNivelAviso" value="IMPORTANTE"> ⚠️ IMPORTANTE
+                        </label>
+                        <label class="qf-radio-urg" style="cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 8px; border-radius: 8px; border: 1.5px solid var(--accent-red); background: rgba(255,82,82,0.12); color: var(--accent-red); font-size: 11.5px; font-weight: 900;">
+                            <input type="radio" name="qfNivelAviso" value="URGENTE"> 🚨 URGENTE / QUIEBRE
+                        </label>
+                    </div>
+
+                    <label class="qf-lbl-paso" style="font-size: 11px; font-weight: 800; color: var(--accent-blue); text-transform: uppercase; display: block; margin-bottom: 6px;">
+                        2. Mensaje para el Equipo de Farmacia y Servicios:
+                    </label>
+                    <textarea id="qf-input-nuevo-aviso" class="login-input" rows="3" placeholder="Ej: Quiebre temporal de Meropenem 1g, reemplazar según pauta PROA..." style="width: 100%; margin: 0; padding: 10px; font-size: 13px; resize: vertical; font-family: inherit;"></textarea>
+
+                    <button type="button" onclick="window.publicarNuevoAvisoInfoClinicaQF()" style="width: 100%; margin-top: 10px; padding: 10px; border-radius: 10px; border: none; background: linear-gradient(135deg, #00e676, #00c853); color: #000; font-weight: 900; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                        <span class="material-icons-round" style="font-size: 18px;">send</span>
+                        PUBLICAR AVISO EN PIZARRA CLÍNICA
+                    </button>
+                </div>
+
+                <div style="font-size: 11px; font-weight: 900; color: var(--text-muted); text-transform: uppercase; margin-top: 14px; margin-bottom: 6px;">
+                    Avisos Activos Actualmente:
+                </div>
+                <div id="qf-lista-avisos-modal" style="flex: 1; overflow-y: auto; max-height: 220px; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;"></div>
+
+                <div class="modal-actions" style="margin-top: 14px;">
+                    <button type="button" class="btn-entendido" style="width: 100%;" onclick="window.cerrarModalGestionInfoClinicaQF()">CERRAR PIZARRA</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    window.renderizarListaModalInfoClinicaQF();
+    modal.style.display = "flex";
+    setTimeout(() => {
+        modal.classList.add("show");
+        document.getElementById("qf-input-nuevo-aviso")?.focus();
+    }, 15);
+};
+
+window.cerrarModalGestionInfoClinicaQF = function () {
+    const modal = document.getElementById("modal-info-clinica-qf");
+    if (!modal) return;
+    modal.classList.remove("show");
+    setTimeout(() => modal.style.display = "none", 250);
+};
+
+window.renderizarListaModalInfoClinicaQF = function () {
+    const cont = document.getElementById("qf-lista-avisos-modal");
+    if (!cont) return;
+
+    const mensajes = window.avisosClinicosCache || [];
+    if (mensajes.length === 0) {
+        cont.innerHTML = `<div style="text-align:center; padding:18px; color:var(--text-muted); font-size:12px;">No hay avisos publicados.</div>`;
+        return;
+    }
+
+    cont.innerHTML = mensajes.map((item, idx) => {
+        const esObjeto = typeof item === "object" && item !== null;
+        const texto = esObjeto ? item.texto : String(item);
+        const autor = esObjeto ? (item.autor || "QF") : "QF";
+        const fecha = esObjeto ? (item.fecha || "") : "";
+        return `
+            <div class="qf-item-aviso" style="display: flex; justify-content: space-between; align-items: center; gap: 10px; background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); padding: 8px 12px; border-radius: 8px; font-size: 12px;">
+                <div style="flex: 1;">
+                    <div style="font-weight: 700; color: var(--text-main);">${texto}</div>
+                    <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Por: QF ${autor} ${fecha ? `· ${fecha}` : ""}</div>
+                </div>
+                <button type="button" onclick="window.eliminarAvisoInfoClinicaQF(${idx})" style="background: rgba(255,82,82,0.15); color: var(--accent-red); border: 1px solid rgba(255,82,82,0.3); border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: 800; cursor: pointer;">
+                    BORRAR
+                </button>
+            </div>
+        `;
+    }).join("");
+};
+
+window.publicarNuevoAvisoInfoClinicaQF = async function () {
+    if (!window.esUsuarioRolQF()) return;
+    const inp = document.getElementById("qf-input-nuevo-aviso");
+    const texto = (inp?.value || "").trim();
+    if (!texto) {
+        alert("⚠️ Escriba el contenido del aviso antes de publicar.");
+        return;
+    }
+
+    const radioNivel = document.querySelector('input[name="qfNivelAviso"]:checked');
+    const nivel = radioNivel ? radioNivel.value : "INFO";
+    const usuario = JSON.parse(sessionStorage.getItem("FarmaPerfil_Sesion") || "{}");
+    const ahora = new Date();
+    const fechaStr = `${ahora.toLocaleDateString('es-CL')} ${ahora.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}`;
+
+    const nuevoAviso = {
+        texto,
+        nivel,
+        autor: usuario.nombre || "Químico Farmacéutico",
+        fecha: fechaStr,
+        timestamp: Date.now()
+    };
+
+    const nuevaLista = [nuevoAviso, ...(window.avisosClinicosCache || [])];
+
+    try {
+        await setDoc(doc(window.db, "config_maestra", "pizarra_avisos"), { mensajes: nuevaLista }, { merge: true });
+        if (inp) inp.value = "";
+        window.mostrarToastFarmacia("El aviso ya está visible en Info Clínica para todo el equipo.", "📢 Novedad Publicada");
+    } catch (e) {
+        alert("❌ Error al publicar aviso en Firestore: " + e.message);
+    }
+};
+
+window.eliminarAvisoInfoClinicaQF = async function (indice) {
+    if (!window.esUsuarioRolQF()) return;
+    const nuevaLista = (window.avisosClinicosCache || []).filter((_, idx) => idx !== indice);
+    try {
+        await setDoc(doc(window.db, "config_maestra", "pizarra_avisos"), { mensajes: nuevaLista }, { merge: true });
+    } catch (e) {
+        alert("❌ Error al eliminar aviso: " + e.message);
+    }
+};
+
+const _intentarLoginOriginalQF = window.intentarLogin;
+window.intentarLogin = async function () {
+    await _intentarLoginOriginalQF();
+    window.actualizarVisibilidadBotonesInfoQF();
+    window.renderizarTarjetasInfoClinica();
+};
+
+const _comenzarTurnoWebOriginalQF = window.comenzarTurnoWeb;
+window.comenzarTurnoWeb = function () {
+    _comenzarTurnoWebOriginalQF();
+    window.actualizarVisibilidadBotonesInfoQF();
+};
+
+setTimeout(() => {
+    window.iniciarPizarraInfoClinicaTiempoReal();
+}, 600);
