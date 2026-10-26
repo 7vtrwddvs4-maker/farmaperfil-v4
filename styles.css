@@ -1361,3 +1361,18 @@ body.light-theme .input-nuevo-concil {
         border: 1px solid #cbd5e1 !important;
     }
 }
+
+/* =========================================================
+   SEPARACIÓN AUTOMÁTICA DE CABECERA CUANDO INGRESA UN QF
+   ========================================================= */
+@media screen {
+    /* Cuando el botón de Pizarra QF está activo, corre el bloque de nombre a la izquierda */
+    .header-cell.title-cell.modo-cabecera-qf .user-info-header {
+        right: 205px !important;
+        padding-right: 8px !important;
+    }
+
+    #btnPizarraQFHeader {
+        right: 150px !important;
+    }
+}

@@ -7779,13 +7779,17 @@ window.actualizarVisibilidadBotonesInfoQF = function () {
     const btnPortada = document.getElementById("btn-gestionar-info-qf");
     const btnHeader = document.getElementById("btnPizarraQFHeader");
     const userInfoHeader = document.querySelector(".user-info-header");
+    const titleCell = document.querySelector(".header-cell.title-cell");
 
     if (btnPortada) btnPortada.style.display = esQF ? "inline-flex" : "none";
     if (btnHeader) btnHeader.style.display = esQF ? "flex" : "none";
 
-    // Correr el bloque del nombre de usuario a 198px cuando hay 4 botones para que jamás se pisen
+    // Activar clase en la celda padre y aplicar !important en línea para vencer cualquier regla previa de CSS
+    if (titleCell) {
+        titleCell.classList.toggle("modo-cabecera-qf", esQF);
+    }
     if (userInfoHeader) {
-        userInfoHeader.style.right = esQF ? "198px" : "150px";
+        userInfoHeader.style.setProperty("right", esQF ? "205px" : "150px", "important");
     }
 };
 
