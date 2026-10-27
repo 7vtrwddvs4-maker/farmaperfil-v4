@@ -39,6 +39,17 @@ const PROTOCOLOS_RESTRINGIDOS = {
     "valsartan": { especialidad: "Cardiología", medicos: ["Dr. Escobar", "Dr. Garibaldi", "Dr. Palma"] },
     "vildagliptina": { especialidad: "Cardiología / Diabetología", medicos: ["Dr. Escobar", "Dr. Garibaldi", "Dr. Palma", "Dr. Sanhueza"] },
     "linagliptina": { especialidad: "Diabetología", medicos: ["Dr. Sanhueza"] },
+
+    // Broncopulmonar (Dr. Stock)
+    "budesonida/formoterol": { especialidad: "Broncopulmonar", medicos: ["Dr. Stock"] },
+    "budesonida / formoterol": { especialidad: "Broncopulmonar", medicos: ["Dr. Stock"] },
+    "formoterol": { especialidad: "Broncopulmonar", medicos: ["Dr. Stock"] },
+    "tiotropio/olodaterol": { especialidad: "Broncopulmonar", medicos: ["Dr. Stock"] },
+    "tiotropio / olodaterol": { especialidad: "Broncopulmonar", medicos: ["Dr. Stock"] },
+    "tiotropio": { especialidad: "Broncopulmonar", medicos: ["Dr. Stock"] },
+    "olodaterol": { especialidad: "Broncopulmonar", medicos: ["Dr. Stock"] },
+    "mometasona 50": { especialidad: "Broncopulmonar", medicos: ["Dr. Stock"] },
+
     // Psiquiatría (Risperidona y Sertralina liberadas; Olanzapina solo restringida si > 10 mg/día)
     "bupropion": { especialidad: "Psiquiatría", medicos: ["Equipo Psiquiatría"] },
     "aripiprazol": { especialidad: "Psiquiatría", medicos: ["Equipo Psiquiatría"] },
@@ -57,11 +68,14 @@ const PROTOCOLOS_RESTRINGIDOS = {
     "trihexifenidilo": { especialidad: "Psiquiatría", medicos: ["Equipo Psiquiatría"] },
     "venlafaxina": { especialidad: "Psiquiatría", medicos: ["Equipo Psiquiatría"] },
     "trazodona": { especialidad: "Psiquiatría", medicos: ["Equipo Psiquiatría"] },
-    // Dermatología
-    "mometasona": { especialidad: "Dermatología", medicos: ["Equipo Dermatología"] },
-    "clobetasol": { especialidad: "Dermatología", medicos: ["Equipo Dermatología"] },
+
+    // Dermatología (Equipo Dermatología)
+    "terbinafina": { especialidad: "Dermatología", medicos: ["Equipo Dermatología"] },
+    "mometasona 0.1": { especialidad: "Dermatología", medicos: ["Equipo Dermatología"] },
+    "mometasona 0,1": { especialidad: "Dermatología", medicos: ["Equipo Dermatología"] },
+    "hidrocortisona 1%": { especialidad: "Dermatología", medicos: ["Equipo Dermatología"] },
     "mupirocina": { especialidad: "Dermatología", medicos: ["Equipo Dermatología"] },
-    "hidrocortisona 1%": { especialidad: "Dermatología", medicos: ["Equipo Dermatología"] }
+    "clobetasol": { especialidad: "Dermatología", medicos: ["Equipo Dermatología"] }
 };
 
 const DB_LIQUIDOS = {
@@ -1325,18 +1339,90 @@ document.addEventListener("input", function (e) {
     }
 });
 
+// ============================================================================
+// AUTOCOMPLETADO DE VÍA DIRECTO DESDE FIRESTORE (catalogo_cdss -> viaPorDefecto)
+// ============================================================================
+window.autocompletarViaDesdeCatalogo = function (inputNombre) {
+    if (!inputNombre) return false;
+    const fila = inputNombre.closest("tr") || inputNombre.closest(".item-conciliacion-nuevo");
+    if (!fila) return false;
+
+    const inputVia = fila.querySelector('input[data-lista="vias"]');
+    if (!inputVia) return false;
+
+    const medBuscado = window.quitarTildes((inputNombre.value || "").trim().toLowerCase());
+    if (!medBuscado) return false;
+
+    let viaEncontrada = "";
+
+    // 1. Buscar prioridad absoluta en tu catálogo oficial de Firestore (catalogo_cdss)
+    if (window.datosGlobales && Array.isArray(window.datosGlobales.catalogo)) {
+        // Primero coincidencia exacta de nombre
+        let itemCatalogo = window.datosGlobales.catalogo.find(item =>
+            window.quitarTildes((item.medicamento || "").trim().toLowerCase()) === medBuscado
+        );
+
+        // Si no es exacta, coincidencia parcial segura
+        if (!itemCatalogo) {
+            itemCatalogo = window.datosGlobales.catalogo.find(item => {
+                const catMed = window.quitarTildes((item.medicamento || "").trim().toLowerCase());
+                return catMed && (catMed === medBuscado || medBuscado.includes(catMed) || catMed.includes(medBuscado));
+            });
+        }
+
+        if (itemCatalogo && itemCatalogo.viaPorDefecto) {
+            viaEncontrada = String(itemCatalogo.viaPorDefecto).trim().toUpperCase();
+        }
+    }
+
+    // 2. Respaldo secundario solo para insumos/fórmulas que no estén en catalogo_cdss (ej. sueros o nutriciones)
+    if (!viaEncontrada) {
+        if (["salbutamol", "ipratropio", "budesonida", "fluticasona", "brexotide", "tiotropio", "olodaterol"].some(k => medBuscado.includes(k))) {
+            viaEncontrada = "INH";
+        } else if (["sodio cloruro", "nacl", "glucosa 5%", "glucosa 10%", "ringer", "albumina"].some(k => medBuscado.includes(k))) {
+            viaEncontrada = "EV";
+        }
+    }
+
+    if (viaEncontrada !== "") {
+        inputVia.value = viaEncontrada;
+        inputVia.style.color = "var(--text-main)";
+        inputVia.style.fontWeight = "900";
+        return true;
+    }
+
+    return false;
+};
+
 window.seleccionarOpcion = function (texto) {
     const menuFlotante = document.getElementById("menu-flotante");
-    if (window.inputActivo.getAttribute("data-lista") === "alergias") {
-        let partes = window.inputActivo.value.split(',');
+    const inputActual = window.inputActivo;
+
+    if (inputActual.getAttribute("data-lista") === "alergias") {
+        let partes = inputActual.value.split(',');
         partes.pop();
         let nuevaAlergia = partes.length > 0 ? " " + texto : texto;
-        window.inputActivo.value = [...partes, nuevaAlergia].join(',') + ", ";
+        inputActual.value = [...partes, nuevaAlergia].join(',') + ", ";
     } else {
-        window.inputActivo.value = texto;
+        inputActual.value = texto;
+
+        // Si seleccionó un medicamento, rellenar automáticamente su vía desde catalogo_cdss
+        if (inputActual.getAttribute("data-lista") === "nombres") {
+            const seRellenoVia = window.autocompletarViaDesdeCatalogo(inputActual);
+
+            // Si se seleccionó con el mouse y la vía ya quedó lista, saltar el cursor directo a "Dosis"
+            const fila = inputActual.closest("tr") || inputActual.closest(".item-conciliacion-nuevo");
+            if (fila) {
+                const siguienteInput = seRellenoVia
+                    ? fila.querySelector('input[data-lista="dosis"]')
+                    : fila.querySelector('input[data-lista="vias"]');
+                if (siguienteInput) setTimeout(() => siguienteInput.focus(), 40);
+            }
+        }
     }
+
     menuFlotante.style.display = "none";
-    window.inputActivo.dispatchEvent(new Event("change", { bubbles: true }));
+    inputActual.dispatchEvent(new Event("change", { bubbles: true }));
 };
 
 window.actualizarResaltado = function () {
@@ -1442,7 +1528,43 @@ window.calcularDosisFila = function (medTexto, viaTexto, dosisTexto, posoTexto, 
         }
     }
 
-    if (dosisTexto === "bic" && posoTexto.includes("c/h")) return 2 * factorDias;
+    if (dosisTexto === "bic") {
+        let cantidadBaseBIC = 2; // Respaldo por defecto si algún fármaco no está en la lista protocoloBIC
+        const medNorm = window.quitarTildes(medTexto.toLowerCase());
+
+        if (window.datosGlobales && Array.isArray(window.datosGlobales.protocoloBIC)) {
+            const itemBIC = window.datosGlobales.protocoloBIC.find(item => {
+                if (typeof item === "string") {
+                    return medNorm.includes(window.quitarTildes(item.split(/[:|-]/)[0].trim().toLowerCase()));
+                }
+                const nombreItem = window.quitarTildes((item.medicamento || item.farmaco || item.nombre || "").trim().toLowerCase());
+                return nombreItem && (nombreItem === medNorm || medNorm.includes(nombreItem) || nombreItem.includes(medNorm));
+            });
+
+            if (itemBIC) {
+                if (typeof itemBIC === "object") {
+                    const valExtraido = itemBIC.cantidad ?? itemBIC.unidades ?? itemBIC.dosis ?? itemBIC.valor ?? itemBIC.frascos ?? itemBIC.ampollas;
+                    if (valExtraido !== undefined && !isNaN(parseFloat(valExtraido))) {
+                        cantidadBaseBIC = parseFloat(valExtraido);
+                    } else {
+                        // Si el campo tiene otro nombre en Firestore, busca el primer valor numérico del objeto
+                        const numEnObjeto = Object.values(itemBIC).find(v => !isNaN(parseFloat(v)) && String(v).trim() !== "" && !String(v).toLowerCase().includes("ml"));
+                        if (numEnObjeto !== undefined) cantidadBaseBIC = parseFloat(numEnObjeto);
+                    }
+                } else if (typeof itemBIC === "string") {
+                    const partes = itemBIC.split(/[:|-]/);
+                    if (partes[1] && !isNaN(parseFloat(partes[1]))) cantidadBaseBIC = parseFloat(partes[1]);
+                }
+            }
+        }
+
+        // Respaldo directo para Propofol si por algún motivo aún no carga la lista
+        if (medNorm.includes("propofol") && cantidadBaseBIC === 2) {
+            cantidadBaseBIC = 1;
+        }
+
+        return Math.ceil(cantidadBaseBIC * factorDias);
+    }
 
     const dosis = window.extraerSoloNumero(dosisTexto);
     const factor = window.obtenerFactorFrecuenciaFront(posoTexto);
@@ -1615,6 +1737,22 @@ window.actualizarSaldosYSidebar = function () {
         }
 
         if (multiData) {
+            // Si el inhalador pertenece a PROTOCOLOS_RESTRINGIDOS (ej. Dr. Stock) y aún no está ACEPTADO, no estampar unidades
+            const rowIdFila = fila.dataset.row;
+            const keyRestr = Object.keys(PROTOCOLOS_RESTRINGIDOS).find(k => medNombre.includes(k));
+            if (keyRestr) {
+                const estadoRestr = window.medicamentosPendientes[`${rowIdFila}|${medNombre}`]?.estado;
+                if (estadoRestr !== "ACEPTADO") {
+                    for (let d = colActiva; d < limiteColumnas; d++) {
+                        if (inputs[5 + d] && inputs[5 + d].dataset.manual !== "true") {
+                            inputs[5 + d].value = "";
+                            window.syncCheckUI(inputs[5 + d]);
+                        }
+                    }
+                    return;
+                }
+            }
+
             let dosisNum = parseFloat(dosisTexto.match(/(\d+(\.\d+)?)/)?.[1]) || 0;
             let esOftalmico = ["cloramfenicol", "lagrima", "lágrima", "pilocarpina", "proparacaina", "proparacaína", "dorzolamida", "latanoprost", "tobramicina"].some(o => medNombre.includes(o));
             if (esOftalmico) dosisNum = dosisNum * 2;
@@ -3129,6 +3267,11 @@ document.getElementById("grillaFila").addEventListener("change", function (e) {
         }
     }
 
+    // Si la celda modificada fue el nombre del medicamento, autocompletar su vía desde Firestore
+    if (listId === "nombres" && inputs[0].value.trim() !== "") {
+        window.autocompletarViaDesdeCatalogo(inputs[0]);
+    }
+
     const medTexto = inputs[0].value.trim();
     const viaTexto = inputs[1].value.trim();
     const dosisTexto = inputs[2].value.trim();
@@ -3210,8 +3353,14 @@ document.addEventListener("keydown", function (e) {
                             if (nextInput) setTimeout(() => nextInput.focus(), 50);
                         }
                     } else if (colIndexActual >= 0 && colIndexActual <= 2) {
-                        const nextTd = tr.children[colIndexActual + 1];
-                        const nextInput = nextTd.querySelector("input, select");
+                        // Si estábamos en Fármaco (col 0) y la Vía (col 1) ya se autocompletó sola, saltar directo a Dosis (col 2)
+                        let destinoCol = colIndexActual + 1;
+                        if (colIndexActual === 0) {
+                            const inpVia = tr.children[1]?.querySelector("input");
+                            if (inpVia && inpVia.value.trim() !== "") destinoCol = 2;
+                        }
+                        const nextTd = tr.children[destinoCol];
+                        const nextInput = nextTd?.querySelector("input, select");
                         if (nextInput) setTimeout(() => nextInput.focus(), 50);
                     }
                 }
