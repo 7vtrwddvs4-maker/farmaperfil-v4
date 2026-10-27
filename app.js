@@ -1386,8 +1386,6 @@ window.autocompletarViaDesdeCatalogo = function (inputNombre) {
 
     if (viaEncontrada !== "") {
         inputVia.value = viaEncontrada;
-        inputVia.style.color = "var(--text-main)";
-        inputVia.style.fontWeight = "900";
         return true;
     }
 
