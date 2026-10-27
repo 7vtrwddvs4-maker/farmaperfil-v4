@@ -1386,6 +1386,9 @@ window.autocompletarViaDesdeCatalogo = function (inputNombre) {
 
     if (viaEncontrada !== "") {
         inputVia.value = viaEncontrada;
+        // Forzamos explícitamente a que borre cualquier rastro de negrita y herede el color normal
+        inputVia.style.fontWeight = "normal";
+        inputVia.style.color = ""; 
         return true;
     }
 
