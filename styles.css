@@ -1376,3 +1376,70 @@ body.light-theme .input-nuevo-concil {
         right: 150px !important;
     }
 }
+
+/* =========================================================
+   CABECERA DOBLE FIJA (STICKY) Y RESETEO INSTANTÁNEO DE SCROLL
+   ========================================================= */
+@media screen {
+    /* 1. CRÍTICO: scroll-behavior: auto !important evita que la animación smooth aborte el regreso a la Fila 1 */
+    .main-content,
+    .med-grid-scroll-wrapper,
+    #contenedor-scroll-grilla {
+        scroll-behavior: auto !important;
+    }
+
+    .med-grid-scroll-wrapper,
+    #contenedor-scroll-grilla {
+        overflow-y: auto !important;
+        overflow-x: auto !important;
+        max-height: calc(100vh - 285px) !important;
+        position: relative !important;
+    }
+
+    /* 2. Fila 1 del thead: altura exacta de 34px para que no se filtre texto por detrás */
+    .med-grid thead tr:nth-child(1) th {
+        position: -webkit-sticky !important;
+        position: sticky !important;
+        top: 0px !important;
+        height: 34px !important;
+        min-height: 34px !important;
+        max-height: 34px !important;
+        box-sizing: border-box !important;
+        z-index: 35 !important;
+        background-color: #12222a !important;
+        box-shadow: 0 1px 0 var(--glass-border) !important;
+    }
+    body.light-theme .med-grid thead tr:nth-child(1) th {
+        background-color: #d5e4f2 !important;
+    }
+
+    /* 3. Fila 2 del thead: clavada en top: 34px exactos sin dejar rendija */
+    .med-grid thead tr:nth-child(2) th {
+        position: -webkit-sticky !important;
+        position: sticky !important;
+        top: 34px !important;
+        height: 34px !important;
+        min-height: 34px !important;
+        max-height: 34px !important;
+        box-sizing: border-box !important;
+        z-index: 34 !important;
+        background-color: #162831 !important;
+        box-shadow: 0 3px 6px rgba(0, 0, 0, 0.25) !important;
+    }
+    body.light-theme .med-grid thead tr:nth-child(2) th {
+        background-color: #dce8f3 !important;
+        box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08) !important;
+    }
+
+    /* 4. Las primeras 5 columnas de la cabecera tienen prioridad doble (fijas arriba y fijas a la izquierda) */
+    .med-grid thead tr:nth-child(1) th:nth-child(1),
+    .med-grid thead tr:nth-child(1) th:nth-child(2),
+    .med-grid thead tr:nth-child(1) th:nth-child(3),
+    .med-grid thead tr:nth-child(2) th:nth-child(1),
+    .med-grid thead tr:nth-child(2) th:nth-child(2),
+    .med-grid thead tr:nth-child(2) th:nth-child(3),
+    .med-grid thead tr:nth-child(2) th:nth-child(4),
+    .med-grid thead tr:nth-child(2) th:nth-child(5) {
+        z-index: 45 !important;
+    }
+}

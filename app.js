@@ -928,6 +928,17 @@ window.limpiarFormularioPerfil = function () {
     window.hayCambiosSinGuardar = false;
     window.datosSincronizados = true;
     window.resetearColumnasDiaA10();
+
+    // Devolver siempre el scroll vertical y horizontal al inicio (Fila 1) al cambiar o limpiar cama
+    const wrapperGrilla = document.getElementById("contenedor-scroll-grilla");
+    if (wrapperGrilla) {
+        wrapperGrilla.scrollTop = 0;
+        wrapperGrilla.scrollLeft = 0;
+    }
+    const mainPanel = document.querySelector(".main-content");
+    if (mainPanel) {
+        mainPanel.scrollTop = 0;
+    }
     document.getElementById("rut").value = "";
     document.getElementById("rut").classList.remove("input-warning");
     document.getElementById("paciente").value = "";
@@ -1619,36 +1630,71 @@ window.calcularDosisFila = function (medTexto, viaTexto, dosisTexto, posoTexto, 
         resultado = 1;
     }
     else {
-        const concentracionMasa = window.extraerSoloMasa(medTexto);
+        let concentracionMasa = window.extraerSoloMasa(medTexto);
         const esLiquido = ["jarabe", "suspension", "gotas"].some(l => medTexto.includes(l));
         const esInyectable = viaTexto.includes("ev") || viaTexto.includes("im") || viaTexto.includes("sc") || viaTexto.includes("iv");
-        const esFrasco = ["ceftriaxona", "cloxacilina", "vancomicina", "piperacilina", "meropenem", "ampicilina", "penicilina", "cefazolina", "cefotaxima", "ceftazidima", "hidrocortisona", "omeprazol 40 mg", "anidulafungina", "amfotericina b", "vial", "frasco", "fa", "heparina"].some(f => medTexto.includes(f));
-        const esCapsula = medTexto.includes("capsula") || medTexto.includes("cápsula") || medTexto.includes("cap") || ["omeprazol 20 mg", "celecoxib", "gabapentina", "tacrolimus", "ciclosporina", "ácido ursodesoxicólico", "acido ursodesoxicolico"].some(f => medTexto.includes(f));
-        const esAmpolla = medTexto.includes("ampolla") || medTexto.includes("furosemida 20 mg/2 ml") || medTexto.includes("amp") || (esInyectable && !esFrasco);
+
+        // Listado completo de Frascos Ampolla / Liofilizados EV que SÍ se guardan reconstituidos durante el día
+        const esFrasco = [
+            "ceftriaxona", "cloxacilina", "vancomicina", "piperacilina", "meropenem", "ertapenem", "imipenem",
+            "ampicilina", "penicilina", "cefazolina", "cefotaxima", "ceftazidima", "cefepime", "tigeciclina",
+            "colistin", "amikacina", "voriconazol", "anidulafungina", "amfotericina", "caspofungina", "aciclovir 250",
+            "ganciclovir", "hidrocortisona 100", "hidrocortisona 500", "metilprednisolona", "omeprazol 40",
+            "pantoprazol 40", "esomeprazol 40", "remifentanilo", "albumina", "albúmina", "protrombina",
+            "vial", "frasco", "fa", "heparina"
+        ].some(f => medTexto.includes(f));
+
+        const esCapsula = medTexto.includes("capsula") || medTexto.includes("cápsula") || medTexto.includes("cap") || [
+            "omeprazol 20 mg", "celecoxib", "gabapentina", "tacrolimus", "ciclosporina", "ácido ursodesoxicólico", "acido ursodesoxicolico"
+        ].some(f => medTexto.includes(f));
+
+        const esAmpolla = !esFrasco && (medTexto.includes("ampolla") || medTexto.includes("furosemida 20 mg/2 ml") || medTexto.includes("amp") || esInyectable);
         const dosisEsML = dosisTexto.includes("ml") || dosisTexto.includes("cc");
 
+        // Normalizar unidades si el fármaco está en gramos (ej: Ertapenem 1 g) y la dosis en mg (ej: 500 mg), o viceversa
+        let dosisNormalizada = dosis;
+        if (!dosisEsML && concentracionMasa > 0) {
+            const medEnGramos = /\b\d+(?:[.,]\d+)?\s*g\b/i.test(medTexto) && !medTexto.includes("mg") && !medTexto.includes("mcg");
+            const medEnMg = medTexto.includes("mg");
+            const dosisEnGramos = /\b\d+(?:[.,]\d+)?\s*g\b/i.test(dosisTexto) && !dosisTexto.includes("mg") && !dosisTexto.includes("mcg");
+            const dosisEnMg = dosisTexto.includes("mg");
+
+            if (medEnGramos && dosisEnMg) {
+                dosisNormalizada = dosis / 1000; // Ej: Dosis 500 mg en Ceftriaxona 1 g -> 0.5 g
+            } else if (medEnMg && dosisEnGramos) {
+                dosisNormalizada = dosis * 1000; // Ej: Dosis 0.5 g en Imipenem 500 mg -> 500 mg
+            }
+        }
+
         let factorCalculo = factor < 1 ? 1 : factor;
-        // Calculamos cuántas administraciones (tomas) ocurren dentro de las horas/días seleccionados (mínimo 1 toma)
         let tomasEnPeriodo = Math.ceil(factorCalculo * factorDias);
 
         if (esLiquido && !esAmpolla) {
-            let volumenDosisML = dosis;
-            if (!dosisEsML && concentracionMasa > 0) volumenDosisML = (dosis * 1) / concentracionMasa;
+            let volumenDosisML = dosisNormalizada;
+            if (!dosisEsML && concentracionMasa > 0) volumenDosisML = (dosisNormalizada * 1) / concentracionMasa;
             let capacidadFrasco = medTexto.includes("valproico") ? 120 : 100;
             resultado = Math.ceil((volumenDosisML * tomasEnPeriodo) / capacidadFrasco) || 1;
         }
-        else if (esAmpolla || esCapsula || esFrasco) {
+        else if (esFrasco) {
+            // FRASCOS / VIALES LIOFILIZADOS EV: Se guarda la fracción sobrante para las siguientes tomas del período
+            if (concentracionMasa > 0) {
+                let volumenVial = window.extraerConcentracionPro(medTexto) || 1;
+                let fraccionFrascoPorToma = dosisEsML ? (dosisNormalizada / volumenVial) : (dosisNormalizada / concentracionMasa);
+                resultado = Math.ceil((fraccionFrascoPorToma * tomasEnPeriodo) - 1e-9);
+            }
+        }
+        else if (esAmpolla || esCapsula) {
+            // AMPOLLAS Y CÁPSULAS: No se guardan abiertas entre tomas; cada administración exige unidades enteras
             if (concentracionMasa > 0) {
                 let volumenAmpolla = window.extraerConcentracionPro(medTexto) || 1;
-                let unidadesPorDosis = dosisEsML ? (dosis / volumenAmpolla) : (dosis / concentracionMasa);
-                // En viales, ampollas y cápsulas, cada toma individual requiere unidades enteras (no se parte un vial a la mitad entre días)
-                resultado = Math.ceil(unidadesPorDosis) * tomasEnPeriodo;
+                let unidadesPorDosis = dosisEsML ? (dosisNormalizada / volumenAmpolla) : (dosisNormalizada / concentracionMasa);
+                resultado = Math.ceil(unidadesPorDosis - 1e-9) * tomasEnPeriodo;
             }
         }
         else {
+            // COMPRIMIDOS ORALES (se pueden fraccionar)
             if (concentracionMasa > 0) {
-                // En comprimidos orales, se multiplica la dosis de cada toma por el número de tomas del período
-                resultado = Math.ceil((dosis / concentracionMasa) * tomasEnPeriodo);
+                resultado = Math.ceil(((dosisNormalizada / concentracionMasa) * tomasEnPeriodo) - 1e-9);
             }
         }
     }
@@ -8181,3 +8227,72 @@ window.comenzarTurnoWeb = function () {
 setTimeout(() => {
     window.iniciarPizarraInfoClinicaTiempoReal();
 }, 600);
+
+// ============================================================================
+// 22. ESTABILIZADOR DEFINITIVO DE SCROLL VERTICAL AL CAMBIAR DE CAMA O SERVICIO
+// ============================================================================
+window.forzarScrollGrillaArriba = function () {
+    if (document.activeElement && document.activeElement.tagName === "INPUT") {
+        document.activeElement.blur();
+    }
+
+    const resetearInstantaneo = () => {
+        // Forzar salto instantáneo (sin animación smooth que se interrumpa a mitad de camino)
+        const contenedores = document.querySelectorAll(
+            ".med-grid-scroll-wrapper, #contenedor-scroll-grilla, .main-content"
+        );
+        contenedores.forEach(el => {
+            el.style.scrollBehavior = "auto";
+            el.scrollTop = 0;
+            el.scrollLeft = 0;
+        });
+
+        // También recorrer cualquier padre de la tabla por seguridad
+        const tabla = document.querySelector("table.med-grid");
+        if (tabla) {
+            let nodo = tabla.parentElement;
+            while (nodo && nodo !== document.body) {
+                if (nodo.scrollTop > 0) {
+                    nodo.style.scrollBehavior = "auto";
+                    nodo.scrollTop = 0;
+                }
+                nodo = nodo.parentElement;
+            }
+        }
+        window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    };
+
+    resetearInstantaneo();
+    requestAnimationFrame(resetearInstantaneo);
+    setTimeout(resetearInstantaneo, 40);
+    setTimeout(resetearInstantaneo, 220);
+    setTimeout(resetearInstantaneo, 420);
+};
+
+const _limpiarFormularioBaseScroll = window.limpiarFormularioPerfil;
+window.limpiarFormularioPerfil = function () {
+    if (typeof _limpiarFormularioBaseScroll === "function") {
+        _limpiarFormularioBaseScroll();
+    }
+    window.forzarScrollGrillaArriba();
+};
+
+const _cambiarCamaNavBaseScroll = window.cambiarCamaNavegacion;
+window.cambiarCamaNavegacion = function (direccion) {
+    window.forzarScrollGrillaArriba();
+    if (typeof _cambiarCamaNavBaseScroll === "function") {
+        _cambiarCamaNavBaseScroll(direccion);
+    }
+};
+
+const _cargarTratamientoBaseScroll = window.cargarTratamientoPacienteCama;
+window.cargarTratamientoPacienteCama = async function () {
+    window.forzarScrollGrillaArriba();
+    if (typeof _cargarTratamientoBaseScroll === "function") {
+        await _cargarTratamientoBaseScroll();
+    }
+    window.forzarScrollGrillaArriba();
+};
+
+document.getElementById("cama")?.addEventListener("change", () => window.forzarScrollGrillaArriba());
+document.getElementById("servicio")?.addEventListener("change", () => window.forzarScrollGrillaArriba());
