@@ -1601,13 +1601,31 @@ window.calcularDosisFila = function (medTexto, viaTexto, dosisTexto, posoTexto, 
         }
     }
     else if (["fresubin", "ensure", "osmolite", "survimed", "diben", "peptamen", "glucerna"].some(n => medTexto.includes(n)) ||
-        posoTexto === "c/h" || posoTexto.includes("ml/h") || posoTexto.includes("cc/h") || posoTexto.includes("gotas/min") ||
+        posoTexto === "c/h" || posoTexto.includes("/h") || posoTexto.includes("ml/h") || posoTexto.includes("cc/h") || posoTexto.includes("gotas/min") ||
         (posoTexto.includes("24h") && (dosisTexto.includes("cc") || dosisTexto.includes("ml")))) {
 
         const esNutricion = ["fresubin", "ensure", "osmolite", "survimed", "diben", "peptamen", "glucerna"].some(n => medTexto.includes(n));
         if ((dosisTexto.includes("mg") || dosisTexto.includes("mcg") || dosisTexto.includes("g") || dosisTexto.includes("ui")) && !esNutricion) {
-            const concentracionMasa = window.extraerSoloMasa(medTexto);
-            if (concentracionMasa > 0) resultado = Math.ceil((dosis * 24 * factorDias) / concentracionMasa);
+            let concentracionMasa = window.extraerSoloMasa(medTexto);
+            if (concentracionMasa > 0) {
+                // Normalizar si el medicamento está en mg y la dosis se indicó en mcg (o viceversa)
+                if (medTexto.includes("mg") && !medTexto.includes("mcg") && dosisTexto.includes("mcg")) {
+                    concentracionMasa = concentracionMasa * 1000;
+                } else if (medTexto.includes("mcg") && dosisTexto.includes("mg") && !dosisTexto.includes("mcg")) {
+                    concentracionMasa = concentracionMasa / 1000;
+                }
+
+                // Detectar si la infusión c/h es ponderada por peso (mcg/kg/h):
+                // - Dexmedetomidina (estándar UCI en mcg/kg/h)
+                // - O si escribieron "kg" en Dosis/Posología
+                const esInfusionPorKiloHora =
+                    medTexto.includes("dexmedetomidina") ||
+                    dosisTexto.includes("kg") ||
+                    posoTexto.includes("kg");
+
+                const factorPeso = esInfusionPorKiloHora ? peso : 1;
+                resultado = Math.ceil((dosis * factorPeso * 24 * factorDias) / concentracionMasa);
+            }
         } else {
             const concentracionVol = window.extraerConcentracionPro(medTexto);
             let volumenDiarioML = (factor === 24 || posoTexto.includes("h")) ? (dosis * 24) : (dosis * factor);
