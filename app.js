@@ -3761,13 +3761,52 @@ document.getElementById("btn-ejecutar-gestion")?.addEventListener("click", async
                 await deleteDoc(doc(window.db, "camas_activas", idOrigen));
                 alert("✅ Perfil vaciado completamente en la nube.");
             } else {
-                document.querySelectorAll("#grillaFila tr input").forEach(inp => {
-                    inp.value = ""; inp.classList.remove("alerta-sobredosis", "alerta-interaccion", "alerta-alergia");
-                    delete inp.dataset.manual; window.syncCheckUI(inp);
+                // 1. Limpiar completamente las fechas de la cabecera y restaurar su estilo
+                document.querySelectorAll(".header-fecha").forEach(inpFecha => {
+                    inpFecha.value = "";
+                    inpFecha.style.background = "transparent";
+                    inpFecha.style.color = "var(--accent-blue)";
                 });
+
+                // 2. Si se habían agregado días adicionales (Día 11+), resetear a las 10 columnas base
+                window.resetearColumnasDiaA10();
+
+                // 3. Limpiar todas las celdas de la grilla de medicamentos
+                document.querySelectorAll("#grillaFila tr input").forEach(inp => {
+                    inp.value = "";
+                    inp.classList.remove("alerta-sobredosis", "alerta-interaccion", "alerta-alergia");
+                    inp.style.color = "";
+                    delete inp.dataset.manual;
+                    delete inp.dataset.pendiente;
+                    delete inp.dataset.omitidoConciliacion;
+                    window.syncCheckUI(inp);
+                });
+
+                // 4. Limpiar avisos y memoria CDSS/pendientes locales
+                document.querySelectorAll("#grillaFila tr .mensaje-reaccion").forEach(msg => {
+                    msg.style.display = "none";
+                });
+                window.medicamentosPendientes = {};
+                window.sobredosisValidadas.clear();
+                window.interaccionesValidadas.clear();
+                window.alertasEmitidas.clear();
+
+                // 5. Restablecer controles de despacho a valores iniciales
+                const inpDias = document.getElementById("inputDias");
+                if (inpDias) inpDias.value = "1";
+                const selHoras = document.getElementById("selectHorasDespacho");
+                if (selHoras) {
+                    selHoras.value = "24";
+                    selHoras.style.background = "rgba(64, 196, 255, 0.12)";
+                    selHoras.style.color = "var(--accent-blue)";
+                    selHoras.style.borderColor = "var(--accent-blue)";
+                }
+
+                // 6. Actualizar paneles laterales y sincronizar en Firestore
                 window.actualizarSaldosYSidebar();
+                window.forzarScrollGrillaArriba();
                 await window.ejecutarGuardadoSilencioso(servicioOrigen, camaOrigen);
-                alert("✅ Grilla de medicamentos limpiada.");
+                alert("✅ Medicamentos y fechas limpiados correctamente.");
             }
             window.cerrarModalGestion();
         }
