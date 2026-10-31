@@ -8006,7 +8006,7 @@ window.iniciarPizarraInfoClinicaTiempoReal = function () {
         const btnHeaderQF = document.createElement("button");
         btnHeaderQF.id = "btnPizarraQFHeader";
         btnHeaderQF.className = "theme-toggle-btn";
-        btnHeaderQF.style.cssText = "right: 150px; display: none;";
+        btnHeaderQF.style.cssText = "right: 195px; display: none;";
         btnHeaderQF.title = "Publicar Novedad en Info Clínica (Exclusivo QF)";
         btnHeaderQF.onclick = () => window.abrirModalGestionInfoClinicaQF();
         btnHeaderQF.innerHTML = `<span class="material-icons-round" style="color: var(--accent-blue);">campaign</span>`;
@@ -8042,7 +8042,7 @@ window.actualizarVisibilidadBotonesInfoQF = function () {
         titleCell.classList.toggle("modo-cabecera-qf", esQF);
     }
     if (userInfoHeader) {
-        userInfoHeader.style.setProperty("right", esQF ? "205px" : "150px", "important");
+        userInfoHeader.style.setProperty("right", esQF ? "245px" : "195px", "important");
     }
 };
 
@@ -8294,7 +8294,6 @@ window.forzarScrollGrillaArriba = function () {
     }
 
     const resetearInstantaneo = () => {
-        // Forzar salto instantáneo (sin animación smooth que se interrumpa a mitad de camino)
         const contenedores = document.querySelectorAll(
             ".med-grid-scroll-wrapper, #contenedor-scroll-grilla, .main-content"
         );
@@ -8304,7 +8303,6 @@ window.forzarScrollGrillaArriba = function () {
             el.scrollLeft = 0;
         });
 
-        // También recorrer cualquier padre de la tabla por seguridad
         const tabla = document.querySelector("table.med-grid");
         if (tabla) {
             let nodo = tabla.parentElement;
@@ -8353,3 +8351,160 @@ window.cargarTratamientoPacienteCama = async function () {
 
 document.getElementById("cama")?.addEventListener("change", () => window.forzarScrollGrillaArriba());
 document.getElementById("servicio")?.addEventListener("change", () => window.forzarScrollGrillaArriba());
+
+// ============================================================================
+// 23. MOTOR DE TUTORIAL INTERACTIVO (CON RESPALDO AUTOMÁTICO DE RED)
+// ============================================================================
+window.asegurarLibreriaTutorial = function () {
+    return new Promise((resolve) => {
+        const obtenerConstructor = () => window.driver?.js?.driver || window.driver?.driver || (typeof window.driver === "function" ? window.driver : null);
+        if (obtenerConstructor()) {
+            resolve(obtenerConstructor());
+            return;
+        }
+
+        if (!document.getElementById("css-driver-fallback")) {
+            const link = document.createElement("link");
+            link.id = "css-driver-fallback";
+            link.rel = "stylesheet";
+            link.href = "https://unpkg.com/driver.js@1.3.1/dist/driver.css";
+            document.head.appendChild(link);
+        }
+
+        const script = document.createElement("script");
+        script.src = "https://unpkg.com/driver.js@1.3.1/dist/driver.js.iife.js";
+        script.onload = () => resolve(obtenerConstructor());
+        script.onerror = () => resolve(null);
+        document.head.appendChild(script);
+    });
+};
+
+window.iniciarTutorialFarmaPerfil = async function () {
+    const driverFunc = await window.asegurarLibreriaTutorial();
+
+    if (!driverFunc) {
+        alert("⚠️ No se pudo descargar el módulo del tutorial. Verifique su conexión a internet.");
+        return;
+    }
+
+    if (typeof window.forzarScrollGrillaArriba === "function") {
+        window.forzarScrollGrillaArriba();
+    }
+
+    const tour = driverFunc({
+        showProgress: true,
+        animate: true,
+        smoothScroll: true,
+        allowClose: true,
+        stagePadding: 6,
+        stageRadius: 10,
+        doneBtnText: "¡Entendido!",
+        closeBtnText: "Cerrar",
+        nextBtnText: "Siguiente ▶",
+        prevBtnText: "◀ Atrás",
+        popoverClass: "driverjs-theme-farmaperfil",
+        steps: [
+            {
+                element: ".header-grid",
+                popover: {
+                    title: "👋 ¡Bienvenido a FarmaPerfil v4.0!",
+                    description: "Este recorrido interactivo te mostrará paso a paso cómo gestionar el perfil farmacológico, validar alertas clínicas y despachar medicamentos.",
+                    side: "bottom",
+                    align: "center"
+                }
+            },
+            {
+                element: "#servicio",
+                popover: {
+                    title: "1. Selección de Servicio Clínico",
+                    description: "Elige aquí el servicio donde estás trabajando (ej. UCI, Medicina, Cirugía). Al cambiarlo se actualizará automáticamente la lista de camas.",
+                    side: "bottom",
+                    align: "start"
+                }
+            },
+            {
+                element: "#cama",
+                popover: {
+                    title: "2. Navegación por Camas",
+                    description: "Selecciona una cama de la lista o usa las flechas <b>◀</b> y <b>▶</b> para avanzar rápidamente al siguiente paciente sincronizado en la nube.",
+                    side: "bottom",
+                    align: "center"
+                }
+            },
+            {
+                element: ".patient-grid",
+                popover: {
+                    title: "3. Ficha Clínica del Paciente",
+                    description: "Registra el Nombre, N° de Ficha, RUT, Edad, Diagnóstico y <b>Peso (kg)</b>. El Peso recalcula automáticamente las infusiones en mcg/kg/h (como Dexmedetomidina).",
+                    side: "bottom",
+                    align: "center"
+                }
+            },
+            {
+                element: ".alergia-cell",
+                popover: {
+                    title: "4. Escáner de Alergias y Familias",
+                    description: "Si anotas una alergia (ej. <i>Penicilina, AINEs</i>), el sistema bloqueará automáticamente cualquier medicamento de esa familia que intentes digitar.",
+                    side: "bottom",
+                    align: "end"
+                }
+            },
+            {
+                element: ".med-grid thead tr:nth-child(2) th:nth-child(1)",
+                popover: {
+                    title: "5. Ingreso Inteligente de Fármacos",
+                    description: "Escribe el nombre del medicamento en cualquier fila. Al seleccionarlo del catálogo, la <b>Vía</b> se completará sola y el cursor saltará directo a la <b>Dosis</b>.",
+                    side: "bottom",
+                    align: "start"
+                }
+            },
+            {
+                element: ".med-grid thead tr:nth-child(1) th:nth-child(2)",
+                popover: {
+                    title: "6. Días y Horas de Despacho",
+                    description: "Ajusta por cuántos días despacharás (ej. fin de semana) o selecciona fracciones de horas (12h, 8h, 6h) para turnos de urgencia/noche.",
+                    side: "bottom",
+                    align: "center"
+                }
+            },
+            {
+                element: ".med-grid thead tr:nth-child(2) th:nth-child(6)",
+                popover: {
+                    title: "7. Iniciar Día y Conciliación (Botón ▶)",
+                    description: "Presiona el botón verde <b>▶</b> en la columna de hoy para estampar la fecha. Desde el Día 2 en adelante, se abrirá el asistente de conciliación para arrastrar el tratamiento.",
+                    side: "bottom",
+                    align: "center"
+                }
+            },
+            {
+                element: ".sidebar",
+                popover: {
+                    title: "8. Panel de Control: Multidosis y Tránsito",
+                    description: "Aquí monitoreas en tiempo real cuántos días duran los inhaladores, jarabes o insulinas (<b>T</b> = Tiene saldo), las visaciones pendientes de QF y los pacientes en tránsito.",
+                    side: "left",
+                    align: "start"
+                }
+            },
+            {
+                element: ".btn-gestion-cama",
+                popover: {
+                    title: "9. Traslados, Egresos y Limpieza",
+                    description: "Desde este botón puedes trasladar al paciente de cama (o intercambiar camas si está ocupada), enviarlo a tránsito, archivar su alta o limpiar la grilla.",
+                    side: "top",
+                    align: "start"
+                }
+            },
+            {
+                element: "#btnCalculadora",
+                popover: {
+                    title: "10. Calculadora Clínica Integrada",
+                    description: "Haz clic aquí para calcular bombas de infusión (ml/h y gamas), dosis pediátricas en gotas/mL, Clearance Renal (Cockcroft-Gault) y esquemas de Prednisona.",
+                    side: "top",
+                    align: "end"
+                }
+            }
+        ]
+    });
+
+    tour.drive();
+};

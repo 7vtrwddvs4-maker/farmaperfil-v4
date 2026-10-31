@@ -29,6 +29,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="FarmaPerfil v4">
+    <!-- Librería Driver.js para el Tutorial Interactivo (Con servidor de respaldo) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.3.1/dist/driver.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/driver.js@1.3.1/dist/driver.js.iife.js"></script>
 </head>
 
 <body>
@@ -317,19 +320,24 @@
                     <button class="btn-logout" onclick="cerrarSesion()">Cerrar Sesión (Cambio de Turno)</button>
                 </div>
 
-                <button class="theme-toggle-btn" id="btnCampanaVisacion" style="right: 105px;"
+                <button class="theme-toggle-btn" id="btnCampanaVisacion" style="right: 150px;"
                     onclick="window.abrirModalBandejaVisacion()" title="Bandeja de Visación y Autorizaciones en Vivo">
                     <span class="material-icons-round" id="iconoCampanaVisacion">notifications</span>
                     <span id="badgeCampanaVisacion"
                         style="display: none; position: absolute; top: -4px; right: -4px; background: var(--accent-red); color: white; font-size: 10px; font-weight: 900; padding: 2px 5px; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.4);">0</span>
                 </button>
 
-                <button class="theme-toggle-btn" style="right: 60px;" onclick="volverAlMenuPrincipal()"
+                <button class="theme-toggle-btn" style="right: 105px;" onclick="volverAlMenuPrincipal()"
                     title="Volver al Menú Principal">
                     <span class="material-icons-round">home</span>
                 </button>
 
-                <button class="theme-toggle-btn" onclick="toggleTheme()" title="Cambiar Tema">
+                <button id="btn-tutorial-app" class="theme-toggle-btn" style="right: 60px;"
+                    onclick="window.iniciarTutorialFarmaPerfil()" title="Tutorial Paso a Paso">
+                    <span class="material-icons-round" style="color: var(--accent-green);">help_outline</span>
+                </button>
+
+                <button class="theme-toggle-btn" style="right: 15px;" onclick="toggleTheme()" title="Cambiar Tema">
                     <span class="material-icons-round" id="theme-icon">light_mode</span>
                 </button>
             </div>

@@ -1363,17 +1363,63 @@ body.light-theme .input-nuevo-concil {
 }
 
 /* =========================================================
-   SEPARACIÓN AUTOMÁTICA DE CABECERA CUANDO INGRESA UN QF
+   SEPARACIÓN AUTOMÁTICA DE CABECERA Y ESTILO DEL TUTORIAL
    ========================================================= */
 @media screen {
+    .user-info-header {
+        right: 195px !important;
+    }
+
     /* Cuando el botón de Pizarra QF está activo, corre el bloque de nombre a la izquierda */
     .header-cell.title-cell.modo-cabecera-qf .user-info-header {
-        right: 205px !important;
+        right: 245px !important;
         padding-right: 8px !important;
     }
 
     #btnPizarraQFHeader {
-        right: 150px !important;
+        right: 195px !important;
+    }
+
+    /* Diseño moderno para las tarjetas del Tutorial (Driver.js) */
+    .driver-popover.driverjs-theme-farmaperfil {
+        background: #14242d !important;
+        color: #ffffff !important;
+        border: 1.5px solid #40c4ff !important;
+        border-radius: 16px !important;
+        padding: 18px !important;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6) !important;
+        max-width: 360px !important;
+    }
+    .driver-popover.driverjs-theme-farmaperfil .driver-popover-title {
+        font-size: 16px !important;
+        font-weight: 900 !important;
+        color: #00e676 !important;
+        margin-bottom: 8px !important;
+    }
+    .driver-popover.driverjs-theme-farmaperfil .driver-popover-description {
+        font-size: 13px !important;
+        line-height: 1.5 !important;
+        color: #e2e8f0 !important;
+    }
+    .driver-popover.driverjs-theme-farmaperfil .driver-popover-progress-text {
+        color: #40c4ff !important;
+        font-weight: 800 !important;
+        font-size: 11px !important;
+    }
+    .driver-popover.driverjs-theme-farmaperfil .driver-popover-next-btn,
+    .driver-popover.driverjs-theme-farmaperfil .driver-popover-prev-btn {
+        background: #40c4ff !important;
+        color: #000000 !important;
+        border: none !important;
+        text-shadow: none !important;
+        font-weight: 900 !important;
+        border-radius: 8px !important;
+        padding: 6px 12px !important;
+        font-size: 12px !important;
+    }
+    .driver-popover.driverjs-theme-farmaperfil .driver-popover-prev-btn {
+        background: rgba(255, 255, 255, 0.15) !important;
+        color: #ffffff !important;
     }
 }
 
