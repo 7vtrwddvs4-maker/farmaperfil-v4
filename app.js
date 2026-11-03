@@ -1497,6 +1497,11 @@ window.obtenerFactorFrecuenciaFront = function (texto) {
 window.extraerSoloMasa = function (texto) {
     if (!texto) return 0;
     let t = window.limpiarDecimales(texto).toLowerCase();
+    // Si hay paréntesis secundarios como "Paracetamol 1 g (10 mg/100 mL)", priorizar el texto principal fuera del paréntesis
+    let sinParentesis = t.replace(/\([^)]*\)/g, "").trim();
+    if (/\d/.test(sinParentesis)) {
+        t = sinParentesis;
+    }
     t = t.replace(/\/\s*\d+([.,]\d+)?\s*(ml|cc)/g, "");
     t = t.replace(/\d+([.,]\d+)?\s*(ml|cc)/g, "");
     let matches = t.match(/(\d+(\.\d+)?)/g);
@@ -1669,17 +1674,19 @@ window.calcularDosisFila = function (medTexto, viaTexto, dosisTexto, posoTexto, 
         const esAmpolla = !esFrasco && (medTexto.includes("ampolla") || medTexto.includes("furosemida 20 mg/2 ml") || medTexto.includes("amp") || esInyectable);
         const dosisEsML = dosisTexto.includes("ml") || dosisTexto.includes("cc");
 
-        // Normalizar unidades si el fármaco está en gramos (ej: Ertapenem 1 g) y la dosis en mg (ej: 500 mg), o viceversa
+        // Normalizar unidades evaluando la unidad principal fuera de paréntesis (evita el bug de "Paracetamol 1 g (10 mg/100 mL)")
         let dosisNormalizada = dosis;
         if (!dosisEsML && concentracionMasa > 0) {
-            const medEnGramos = /\b\d+(?:[.,]\d+)?\s*g\b/i.test(medTexto) && !medTexto.includes("mg") && !medTexto.includes("mcg");
-            const medEnMg = medTexto.includes("mg");
-            const dosisEnGramos = /\b\d+(?:[.,]\d+)?\s*g\b/i.test(dosisTexto) && !dosisTexto.includes("mg") && !dosisTexto.includes("mcg");
-            const dosisEnMg = dosisTexto.includes("mg");
+            const medPrincipal = medTexto.replace(/\([^)]*\)/g, "").trim();
+            const matchUnidadMed = medPrincipal.match(/\d+(?:[.,]\d+)?\s*(mcg|mg|g)\b/i);
+            const unidadMed = matchUnidadMed ? matchUnidadMed[1].toLowerCase() : "";
 
-            if (medEnGramos && dosisEnMg) {
-                dosisNormalizada = dosis / 1000; // Ej: Dosis 500 mg en Ceftriaxona 1 g -> 0.5 g
-            } else if (medEnMg && dosisEnGramos) {
+            const matchUnidadDosis = dosisTexto.match(/\d+(?:[.,]\d+)?\s*(mcg|mg|g)\b/i);
+            const unidadDosis = matchUnidadDosis ? matchUnidadDosis[1].toLowerCase() : "";
+
+            if (unidadMed === "g" && unidadDosis === "mg") {
+                dosisNormalizada = dosis / 1000; // Ej: Dosis 500 mg en Paracetamol 1 g o Ceftriaxona 1 g -> 0.5 g
+            } else if (unidadMed === "mg" && unidadDosis === "g") {
                 dosisNormalizada = dosis * 1000; // Ej: Dosis 0.5 g en Imipenem 500 mg -> 500 mg
             }
         }
