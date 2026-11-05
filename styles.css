@@ -1489,3 +1489,162 @@ body.light-theme .input-nuevo-concil {
         z-index: 45 !important;
     }
 }
+
+/* =========================================================
+   DISEÑO UNIFICADO ESTILO PROA 4.0 PARA LA FICHA DEL PACIENTE
+   (Exclusivo en pantalla - No altera la impresión en papel)
+   ========================================================= */
+@media screen {
+    /* 1. Separar la barra del título superior como tarjeta independiente */
+    .header-grid {
+        border-radius: 14px !important;
+        margin-bottom: 10px !important;
+        border: 1px solid var(--glass-border) !important;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08) !important;
+    }
+    body.light-theme .header-grid {
+        background: #ffffff !important;
+        border-color: #dce4ec !important;
+    }
+
+    /* 2. Contenedor principal de Identificación del Paciente estilo PROA 4.0 */
+    .patient-grid {
+        display: grid !important;
+        grid-template-columns: repeat(4, 1fr) !important;
+        gap: 12px 16px !important;
+        padding: 16px 20px !important;
+        border-radius: 14px !important;
+        border: 1px solid var(--glass-border) !important;
+        background: rgba(0, 0, 0, 0.22) !important;
+        margin-bottom: 14px !important;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.06) !important;
+    }
+    body.light-theme .patient-grid {
+        background: #f8fafc !important;
+        border: 1px solid #dce4ec !important;
+        box-shadow: 0 4px 15px rgba(15, 23, 42, 0.04) !important;
+    }
+
+    /* 3. Quitar los bordes de tabla antiguos entre las celdas */
+    .patient-cell {
+        border: none !important;
+        padding: 0 !important;
+        background: transparent !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: flex-start !important;
+        gap: 5px !important;
+    }
+
+    /* 4. Etiquetas superiores limpias estilo PROA (RUT, NOMBRES, SERVICIO...) */
+    .patient-cell .cell-label {
+        font-size: 10.5px !important;
+        font-weight: 800 !important;
+        color: #94a3b8 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.5px !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 5px !important;
+        padding-left: 2px !important;
+    }
+    body.light-theme .patient-cell .cell-label {
+        color: #64748b !important;
+    }
+    .patient-cell .cell-label span.material-icons-round {
+        font-size: 14px !important;
+        color: var(--accent-blue) !important;
+    }
+
+    /* 5. Casillas de escritura redondeadas (Inputs, Selects y contenedor de Cama) */
+    .patient-cell > input,
+    .patient-cell > select,
+    .patient-cell > div:not(.cell-label) {
+        height: 38px !important;
+        min-height: 38px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        padding: 0 12px !important;
+        border-radius: 10px !important;
+        border: 1.5px solid rgba(255, 255, 255, 0.15) !important;
+        background-color: rgba(15, 28, 36, 0.65) !important;
+        color: var(--text-main) !important;
+        font-size: 14px !important;
+        font-weight: 700 !important;
+        transition: all 0.2s ease !important;
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08) !important;
+    }
+
+    body.light-theme .patient-cell > input,
+    body.light-theme .patient-cell > select,
+    body.light-theme .patient-cell > div:not(.cell-label) {
+        background-color: #ffffff !important;
+        border: 1.5px solid #cbd5e1 !important;
+        color: #0f172a !important;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03) !important;
+    }
+
+    /* Placeholders suaves igual que en PROA */
+    .patient-cell > input::placeholder {
+        color: #94a3b8 !important;
+        font-weight: 500 !important;
+    }
+
+    /* 6. Efecto de foco azul al hacer clic para escribir */
+    .patient-cell > input:focus,
+    .patient-cell > select:focus,
+    .patient-cell > div:not(.cell-label):focus-within {
+        border-color: var(--accent-blue) !important;
+        box-shadow: 0 0 0 3px rgba(64, 196, 255, 0.2) !important;
+        outline: none !important;
+    }
+    body.light-theme .patient-cell > input:focus,
+    body.light-theme .patient-cell > select:focus,
+    body.light-theme .patient-cell > div:not(.cell-label):focus-within {
+        border-color: #0284c7 !important;
+        box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15) !important;
+    }
+
+    /* 7. Ajuste interno para el selector de N° Cama y sus flechas (◀ Cama 1 ▶) */
+    .patient-cell > div:not(.cell-label) {
+        padding: 0 6px !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+    }
+    .patient-cell > div:not(.cell-label) select#cama {
+        border: none !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        height: 100% !important;
+        font-size: 14px !important;
+        font-weight: 800 !important;
+        color: var(--text-main) !important;
+    }
+    body.light-theme .patient-cell > div:not(.cell-label) select#cama {
+        color: #0f172a !important;
+    }
+    .patient-cell > div:not(.cell-label) .btn-nuevo-dia {
+        border-radius: 6px !important;
+        width: 26px !important;
+        height: 26px !important;
+        flex-shrink: 0 !important;
+    }
+
+    /* 8. Casilla de Alergia en la esquina superior derecha también con borde redondeado */
+    .alergia-cell {
+        padding: 10px 14px !important;
+    }
+    .alergia-input {
+        background: rgba(255, 82, 82, 0.06) !important;
+        border: 1.5px solid rgba(255, 82, 82, 0.35) !important;
+        border-radius: 8px !important;
+        padding: 6px 10px !important;
+        height: 36px !important;
+        box-sizing: border-box !important;
+    }
+    .alergia-input:focus {
+        border-color: var(--accent-red) !important;
+        box-shadow: 0 0 0 3px rgba(255, 82, 82, 0.15) !important;
+    }
+}
