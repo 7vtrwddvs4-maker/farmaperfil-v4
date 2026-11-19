@@ -1215,9 +1215,12 @@ window.generarOpcionesDosisInteligentes = function (nombreMed, viaActual, opcion
     const esGotaOral = ["ferroso sulfato 125", "sulfato ferroso 125", "zinc", "tramadol", "vitamina acd", "acd", "biogaia", "risperidona 1 mg/ml"].some(s => medLow.includes(s));
     const esHeparina = medLow.includes("heparina");
     const esInsulina = ["nph", "glargina", "cristalina", "insulina"].some(s => medLow.includes(s));
+    const esEnema = medLow.includes("fleet") || medLow.includes("enema");
     const esPomada = ["nistatina 10", "mometasona", "clotrimazol", "mupirocina", "hidrocortisona 1%", "crema", "pomada", "unguento"].some(s => medLow.includes(s)) || (viaActual && viaActual.toLowerCase() === "top");
 
-    if (esGotaOral) {
+    if (esEnema) {
+        return ["Aplicar"];
+    } else if (esGotaOral) {
         opciones = ["5 gotas", "10 gotas", "15 gotas", "20 gotas", "25 gotas", "30 gotas", "40 gotas"];
     } else if (esPomada) {
         opciones = ["Aplicar"];
@@ -1589,7 +1592,8 @@ window.calcularDosisFila = function (medTexto, viaTexto, dosisTexto, posoTexto, 
     const peso = pesoInput ? parseFloat(pesoInput.value) || 70 : 70;
 
     let resultado = 0;
-    if (!medTexto || !posoTexto || dosis === 0) return "";
+    const esAplicar = dosisTexto.includes("aplicar");
+    if (!medTexto || !posoTexto || (dosis === 0 && !esAplicar)) return "";
 
     if (posoTexto.includes("c/min") || posoTexto.includes("gamas")) {
         let concentracionAmpMcg = window.extraerSoloMasa(medTexto) * (medTexto.includes("mg") ? 1000 : 1);
@@ -1648,6 +1652,10 @@ window.calcularDosisFila = function (medTexto, viaTexto, dosisTexto, posoTexto, 
         let factorCalculo = factor < 1 ? 1 : factor;
         let tomasEnPeriodo = Math.ceil(factorCalculo * factorDias);
         resultado = Math.ceil(dosis * tomasEnPeriodo);
+    }
+    else if (medTexto.includes("fleet") || medTexto.includes("enema")) {
+        let factorCalculo = factor < 1 ? 1 : factor;
+        resultado = Math.ceil(factorCalculo * factorDias);
     }
     else if (dosisTexto.includes("aplicar") || dosisTexto.includes("puff") || dosisTexto.includes("gota") || viaTexto.includes("oft") || ["crema", "pomada", "nistatina 10", "mometasona", "clotrimazol", "mupirocina", "hidrocortisona 1%"].some(t => medTexto.includes(t))) {
         resultado = 1;
@@ -1719,7 +1727,14 @@ window.calcularDosisFila = function (medTexto, viaTexto, dosisTexto, posoTexto, 
         else {
             // COMPRIMIDOS ORALES (se pueden fraccionar)
             if (concentracionMasa > 0) {
-                resultado = Math.ceil(((dosisNormalizada / concentracionMasa) * tomasEnPeriodo) - 1e-9);
+                if (medTexto.includes("hidralazina")) {
+                    if (factor > 0) {
+                        const compNecesarios = (dosisNormalizada / concentracionMasa) * factor * factorDias;
+                        resultado = Math.max(1, Math.ceil((compNecesarios - 1e-9) / 30)) * 30;
+                    }
+                } else {
+                    resultado = Math.ceil(((dosisNormalizada / concentracionMasa) * tomasEnPeriodo) - 1e-9);
+                }
             }
         }
     }
@@ -1763,6 +1778,7 @@ window.actualizarSaldosYSidebar = function () {
     let htmlSaldos = ""; let haySaldos = false;
 
     const diccMultidosis = [
+        { clave: "hidralazina", capacidad: 30, unidad: "comp.", esCajaComprimidos: true, mgPorUnidad: 50 },
         { clave: "heparina", capacidad: 25000, unidad: "UI" },
         { clave: "salbutamol", capacidad: 200, unidad: "puffs" },
         { clave: "ipratropio", capacidad: 200, unidad: "puffs" },
@@ -1825,10 +1841,20 @@ window.actualizarSaldosYSidebar = function () {
                 }
             }
 
-            let dosisNum = parseFloat(dosisTexto.match(/(\d+(\.\d+)?)/)?.[1]) || 0;
+            let dosisNum = window.extraerSoloNumero(dosisTexto);
             let esOftalmico = ["cloramfenicol", "lagrima", "lágrima", "pilocarpina", "proparacaina", "proparacaína", "dorzolamida", "latanoprost", "tobramicina"].some(o => medNombre.includes(o));
-            if (esOftalmico) dosisNum = dosisNum * 2;
-            else if (dosisTexto.includes("gota")) dosisNum = dosisNum / 20;
+            if (multiData.esCajaComprimidos) {
+                const mgPorComp = window.extraerSoloMasa(medNombre) || multiData.mgPorUnidad || 50;
+                let dosisEnMg = dosisNum;
+                if (/\b\d+(?:[.,]\d+)?\s*g\b/i.test(dosisTexto) && !dosisTexto.includes("mg")) {
+                    dosisEnMg = dosisNum * 1000;
+                }
+                dosisNum = mgPorComp > 0 ? (dosisEnMg / mgPorComp) : dosisNum;
+            } else if (esOftalmico) {
+                dosisNum = dosisNum * 2;
+            } else if (dosisTexto.includes("gota")) {
+                dosisNum = dosisNum / 20;
+            }
 
             const factor = window.obtenerFactorFrecuenciaFront(posoTexto);
             const dosisDiaria = dosisNum * factor;
@@ -1845,15 +1871,21 @@ window.actualizarSaldosYSidebar = function () {
                     let celdaDia = inputs[5 + d];
                     if (!celdaDia) break;
                     if (celdaDia.dataset.manual === "true") {
-                        const valMan = celdaDia.value.trim().toUpperCase();
-                        if (valMan !== "" && valMan !== "S/I" && valMan !== "-") balanceActual -= consumoTotal;
+                        const valMan = celdaDia.value.replace("✓", "").trim().toUpperCase();
+                        if (valMan !== "" && valMan !== "S/I" && valMan !== "-") {
+                            const numMan = parseFloat(valMan.replace(",", "."));
+                            if (!isNaN(numMan) && numMan > 0) {
+                                balanceActual += multiData.esCajaComprimidos ? numMan : (numMan * multiData.capacidad);
+                            }
+                            balanceActual -= consumoTotal;
+                        }
                         continue;
                     }
 
                     if (balanceActual < consumoTotal) {
                         let faltante = consumoTotal - balanceActual;
                         let frascos = Math.ceil(faltante / multiData.capacidad);
-                        celdaDia.value = frascos;
+                        celdaDia.value = multiData.esCajaComprimidos ? (frascos * multiData.capacidad) : frascos;
                         celdaDia.style.color = "var(--text-main)";
                         balanceActual += (frascos * multiData.capacidad);
                     } else {
@@ -1865,7 +1897,14 @@ window.actualizarSaldosYSidebar = function () {
                     window.syncCheckUI(celdaDia);
                 }
                 for (let d = limiteColumnas; d < totalCols; d++) { if (inputs[5 + d] && inputs[5 + d].dataset.manual !== "true") { inputs[5 + d].value = ""; window.syncCheckUI(inputs[5 + d]); } }
+
+                balanceActual = Math.round(balanceActual * 100) / 100;
                 window.nuevosSaldosParaManana[multiData.clave] = balanceActual;
+
+                const saldoPrevioFmt = Math.round(saldoPrevio * 100) / 100;
+                const gastoDiarioFmt = Math.round(dosisDiaria * 100) / 100;
+                const balanceFmt = Math.round(balanceActual * 100) / 100;
+                const etiquetaEnvase = multiData.esCajaComprimidos ? `1 caja (${multiData.capacidad} comp.) dura` : "1 envase dura";
 
                 htmlSaldos += `
                   <div class="nutricion-item" style="border-left: 4px solid var(--accent-green); display:block;">
@@ -1873,15 +1912,15 @@ window.actualizarSaldosYSidebar = function () {
                         <span class="nutricion-info" style="text-transform:uppercase;">${medNombre}</span>
                         <div style="font-size:11px; color:var(--text-muted); display:flex; align-items:center; gap:5px;">
                             Saldo Previo: 
-                            <input type="number" class="input-saldo-manual" data-clave="${multiData.clave}" value="${Math.round(saldoPrevio)}" style="width:60px; font-size:12px; padding:3px; border-radius:4px; border:1px solid var(--glass-border); background:rgba(0,0,0,0.2); color:var(--text-main); text-align:center;">
+                            <input type="number" step="any" class="input-saldo-manual" data-clave="${multiData.clave}" value="${saldoPrevioFmt}" style="width:60px; font-size:12px; padding:3px; border-radius:4px; border:1px solid var(--glass-border); background:rgba(0,0,0,0.2); color:var(--text-main); text-align:center;">
                         </div>
                     </div>
                     <div style="margin-top: 10px; display:flex; justify-content:space-between; align-items:flex-end;">
                         <div>
-                            <span class="nutricion-vol" style="color:var(--text-muted);">Gasto Diario: ${Math.round(dosisDiaria * 10) / 10} ${multiData.unidad}</span>
-                            <span class="nutricion-vol" style="color:var(--accent-green); font-weight:bold; margin-top:3px; font-size: 13px;">Queda para mañana: ${Math.round(balanceActual)} ${multiData.unidad}</span>
+                            <span class="nutricion-vol" style="color:var(--text-muted);">Gasto Diario: ${gastoDiarioFmt} ${multiData.unidad}</span>
+                            <span class="nutricion-vol" style="color:var(--accent-green); font-weight:bold; margin-top:3px; font-size: 13px;">Queda para mañana: ${balanceFmt} ${multiData.unidad}</span>
                         </div>
-                        <span style="font-size:10px; font-weight:bold; color:var(--accent-blue); text-align:right;">1 envase dura<br><b style="font-size:16px;">${diasDuracionUnFrasco}</b> días</span>
+                        <span style="font-size:10px; font-weight:bold; color:var(--accent-blue); text-align:right;">${etiquetaEnvase}<br><b style="font-size:16px;">${diasDuracionUnFrasco}</b> días</span>
                     </div>
                   </div>`;
             }
@@ -2097,7 +2136,7 @@ window.abrirModalConciliacionDia = function (colIndex, fechaFormateada) {
     const esUciUti = servicioActual === "uci" || servicioActual === "uti";
 
     const diccEspeciales = [
-        "heparina", "salbutamol", "ipratropio", "brexotide", "budesonida", "fluticasona",
+        "hidralazina", "heparina", "salbutamol", "ipratropio", "brexotide", "budesonida", "fluticasona",
         "formoterol", "tiotropio", "olodaterol", "nph", "glargina", "cristalina",
         "diben", "fresubin", "survimed", "jevity", "osmolite", "smofkabiven", "smoflipid",
         "glucerna", "sodio cloruro", "nacl", "glucosa", "glucosalino", "ringer",
@@ -2159,9 +2198,10 @@ window.abrirModalConciliacionDia = function (colIndex, fechaFormateada) {
                 iniciarOmitido = true;
                 notaClinica = "Dosis única de carga";
             } else if (esPomada) {
+                const esEnemaFila = medLimpio.includes("fleet") || medLimpio.includes("enema");
                 sugerenciaHoy = "1";
                 iniciarOmitido = true;
-                notaClinica = "Tópico / Pomada (según requerimiento)";
+                notaClinica = esEnemaFila ? "Enema (según requerimiento)" : "Tópico / Pomada (según requerimiento)";
             } else if (es48h || es72h) {
                 let diasDesdeUltimaDosis = 0;
                 let ultimaDosisValor = "";
@@ -2190,6 +2230,14 @@ window.abrirModalConciliacionDia = function (colIndex, fechaFormateada) {
                     sugerenciaHoy = calculoBase || "T";
                     iniciarOmitido = true;
                     notaClinica = "Sin indicación ayer (S/I)";
+                } else if (nombreMed.includes("hidralazina")) {
+                    const saldoHidra = window.nuevosSaldosParaManana?.["hidralazina"] ?? 0;
+                    const mgComp = window.extraerSoloMasa(nombreMed) || 50;
+                    const dNum = window.extraerSoloNumero(dosisTexto);
+                    const fNum = window.obtenerFactorFrecuenciaFront(posoTexto);
+                    const consumoHidra = (mgComp > 0 ? (dNum / mgComp) : dNum) * fNum * diasADespachar;
+                    sugerenciaHoy = (saldoHidra >= consumoHidra && consumoHidra > 0) ? "T" : (calculoBase || "30");
+                    notaClinica = `Caja 30 comp. (Saldo: ${Math.round(saldoHidra * 100) / 100} comp.)`;
                 } else {
                     sugerenciaHoy = valorAyer !== "" ? valorAyer : (calculoBase || "T");
                     notaClinica = "Multidosis / Control de saldo";
@@ -3313,7 +3361,7 @@ document.getElementById("grillaFila").addEventListener("change", function (e) {
                     let esSobre = ["saccharomyces", "rehsal", "polietilenglicol", "banatrol"].some(s => nombreMed.includes(s));
                     const esOftalmico = ["cloramfenicol", "lagrima", "lágrima", "pilocarpina", "proparacaina", "proparacaína", "dorzolamida", "latanoprost", "tobramicina"].some(s => nombreMed.includes(s));
                     const esGotaOral = ["ferroso sulfato 125", "sulfato ferroso 125", "zinc", "tramadol", "vitamina acd", "acd", "biogaia", "risperidona 1 mg/ml"].some(s => nombreMed.includes(s));
-                    const esPomada = ["nistatina 10", "mometasona", "clotrimazol", "mupirocina", "hidrocortisona 1%", "crema", "pomada", "unguento"].some(s => nombreMed.includes(s)) || inputs[1].value.toLowerCase() === "top";
+                    const esPomada = ["nistatina 10", "mometasona", "clotrimazol", "mupirocina", "hidrocortisona 1%", "crema", "pomada", "unguento", "fleet", "enema"].some(s => nombreMed.includes(s)) || inputs[1].value.toLowerCase() === "top";
 
                     if (inhaladores.some(inh => nombreMed.includes(inh))) unidadDeducida = "puff";
                     else if (esPomada) { valorLimpio = "Aplicar"; unidadDeducida = ""; }
