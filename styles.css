@@ -1648,3 +1648,25 @@ body.light-theme .input-nuevo-concil {
         box-shadow: 0 0 0 3px rgba(255, 82, 82, 0.15) !important;
     }
 }
+
+/* =========================================================
+   MODO CLARO PARA GESTOR DE CATÁLOGO DE MEDICAMENTOS
+   ========================================================= */
+@media screen {
+    body.light-theme #modal-catalogo-medicamentos .cat-form-box {
+        background: #f8fafc !important;
+        border: 1.5px solid #cbd5e1 !important;
+    }
+    body.light-theme #modal-catalogo-medicamentos .cat-lbl {
+        color: #0369a1 !important;
+    }
+    body.light-theme #modal-catalogo-medicamentos input.login-input {
+        background: #ffffff !important;
+        border: 1.5px solid #94a3b8 !important;
+        color: #0f172a !important;
+    }
+    body.light-theme #modal-catalogo-medicamentos .cat-item-fila {
+        background: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+    }
+}
