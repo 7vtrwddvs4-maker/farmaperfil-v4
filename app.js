@@ -8084,20 +8084,37 @@ window.iniciarPizarraInfoClinicaTiempoReal = function () {
 
 window.actualizarVisibilidadBotonesInfoQF = function () {
     const esQF = window.esUsuarioRolQF();
+    const puedeGestionarCatalogo = typeof window.tienePermisoGestionCatalogo === "function"
+        ? window.tienePermisoGestionCatalogo()
+        : esQF;
+
     const btnPortada = document.getElementById("btn-gestionar-info-qf");
     const btnHeader = document.getElementById("btnPizarraQFHeader");
+    const btnCatalogo = document.getElementById("btnCatalogoMedsHeader");
     const userInfoHeader = document.querySelector(".user-info-header");
     const titleCell = document.querySelector(".header-cell.title-cell");
 
     if (btnPortada) btnPortada.style.display = esQF ? "inline-flex" : "none";
-    if (btnHeader) btnHeader.style.display = esQF ? "flex" : "none";
-
-    // Activar clase en la celda padre y aplicar !important en línea para vencer cualquier regla previa de CSS
-    if (titleCell) {
-        titleCell.classList.toggle("modo-cabecera-qf", esQF);
+    if (btnHeader) {
+        btnHeader.style.display = esQF ? "flex" : "none";
+        btnHeader.style.setProperty("right", "195px", "important");
     }
+
+    if (btnCatalogo) {
+        btnCatalogo.style.display = puedeGestionarCatalogo ? "flex" : "none";
+        // Si es QF va después de la Pizarra (240px); si eres tú como TENS ocupa el puesto de 195px
+        btnCatalogo.style.setProperty("right", esQF ? "240px" : "195px", "important");
+    }
+
+    if (titleCell) {
+        titleCell.classList.toggle("modo-cabecera-qf", esQF || puedeGestionarCatalogo);
+    }
+
     if (userInfoHeader) {
-        userInfoHeader.style.setProperty("right", esQF ? "245px" : "195px", "important");
+        let margenDerecho = "195px";
+        if (esQF && puedeGestionarCatalogo) margenDerecho = "290px";
+        else if (esQF || puedeGestionarCatalogo) margenDerecho = "245px";
+        userInfoHeader.style.setProperty("right", margenDerecho, "important");
     }
 };
 
@@ -8563,3 +8580,445 @@ window.iniciarTutorialFarmaPerfil = async function () {
 
     tour.drive();
 };
+
+// ============================================================================
+// 24. GESTOR DE CATÁLOGO DE MEDICAMENTOS (EXCLUSIVO QF Y ADMINISTRADOR)
+// ============================================================================
+window.medicamentoCatalogoEnEdicion = null;
+
+window.tienePermisoGestionCatalogo = function () {
+    const sesion = JSON.parse(sessionStorage.getItem("FarmaPerfil_Sesion") || "{}");
+    if (!sesion || (!sesion.rol && !sesion.nombre)) return false;
+
+    const esQF = sesion.rol === "Químico Farmacéutico";
+    const nombreNorm = window.quitarTildes((sesion.nombre || "").trim().toUpperCase());
+    const esFrancisco = nombreNorm.includes("FRANCISCO BARRA");
+    const tieneFlagAdmin = sesion.adminCatalogo === true;
+
+    return esQF || esFrancisco || tieneFlagAdmin;
+};
+
+window.iniciarBotonCatalogoMedicamentos = function () {
+    const titleCell = document.querySelector(".header-cell.title-cell");
+    if (titleCell && !document.getElementById("btnCatalogoMedsHeader")) {
+        const btnCat = document.createElement("button");
+        btnCat.id = "btnCatalogoMedsHeader";
+        btnCat.className = "theme-toggle-btn";
+        btnCat.style.cssText = "right: 195px; display: none;";
+        btnCat.title = "Agregar o Editar Medicamentos del Arsenal (QF / Admin)";
+        btnCat.onclick = () => window.abrirModalGestionCatalogoMeds();
+        btnCat.innerHTML = `<span class="material-icons-round" style="color: var(--accent-green);">medication</span>`;
+        titleCell.appendChild(btnCat);
+    }
+
+    if (typeof window.actualizarVisibilidadBotonesInfoQF === "function") {
+        window.actualizarVisibilidadBotonesInfoQF();
+    }
+};
+
+window.abrirModalGestionCatalogoMeds = function () {
+    if (!window.tienePermisoGestionCatalogo()) {
+        alert("🔒 ACCESO RESTRINGIDO\n\nSolo los Químicos Farmacéuticos y el Administrador pueden agregar o modificar medicamentos en el arsenal.");
+        return;
+    }
+
+    let modal = document.getElementById("modal-catalogo-medicamentos");
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "modal-catalogo-medicamentos";
+        modal.className = "modal-overlay";
+        modal.style.cssText = "z-index: 99999999; display: none;";
+        modal.innerHTML = `
+            <div class="modal-container" style="width: 740px; max-width: 96vw; max-height: 92vh; display: flex; flex-direction: column;">
+                <div class="modal-header" style="justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-border); padding-bottom: 12px;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span class="material-icons-round icon" style="color: var(--accent-green); font-size: 36px; background: rgba(0,230,118,0.12); padding: 10px; border-radius: 50%;">medication</span>
+                        <div>
+                            <div style="font-size: 18px; font-weight: 900; color: var(--text-main); text-transform: uppercase;">
+                                GESTOR DE ARSENAL Y CATÁLOGO CDSS
+                            </div>
+                            <div style="color: var(--text-muted); font-size: 12px; margin-top: 2px;">
+                                Sincroniza automáticamente <b>catalogo_cdss</b> y <b>listas_desplegables</b> en Firebase.
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" onclick="window.cerrarModalGestionCatalogoMeds()" style="background: rgba(255,82,82,0.15); color: var(--accent-red); border: none; border-radius: 50%; width: 34px; height: 34px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                        <span class="material-icons-round">close</span>
+                    </button>
+                </div>
+
+                <!-- Formulario de alta / edición -->
+                <div class="cat-form-box" style="background: rgba(0,0,0,0.18); border: 1px solid var(--glass-border); border-radius: 12px; padding: 14px; margin-top: 10px; display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span id="cat-titulo-modo" style="font-size: 11px; font-weight: 900; color: var(--accent-green); text-transform: uppercase; letter-spacing: 0.5px;">
+                            ➕ NUEVO MEDICAMENTO
+                        </span>
+                        <button type="button" id="cat-btn-cancelar-edicion" onclick="window.limpiarFormularioCatalogoMeds()" style="display: none; background: rgba(255,152,0,0.15); color: #ff9800; border: 1px solid #ff9800; border-radius: 6px; padding: 3px 8px; font-size: 10.5px; font-weight: 800; cursor: pointer;">
+                            Cancelar edición
+                        </button>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 2fr 0.9fr 1fr; gap: 10px;">
+                        <div>
+                            <label class="cat-lbl" style="font-size: 10.5px; font-weight: 800; color: var(--accent-blue); text-transform: uppercase; display: block; margin-bottom: 4px;">
+                                Medicamento y Concentración *
+                            </label>
+                            <input type="text" id="cat-med-nombre" class="login-input" placeholder="Ej: Nimodipino 30 mg" autocomplete="off" style="margin: 0; padding: 8px 10px; font-size: 13px; text-align: left;" oninput="window.verificarDuplicadoCatalogoEnVivo()">
+                        </div>
+                        <div>
+                            <label class="cat-lbl" style="font-size: 10.5px; font-weight: 800; color: var(--accent-blue); text-transform: uppercase; display: block; margin-bottom: 4px;">
+                                Vía por Defecto *
+                            </label>
+                            <input type="text" id="cat-med-via" list="cat-lista-vias" class="login-input" placeholder="Ej: O, EV, SC" autocomplete="off" style="margin: 0; padding: 8px 10px; font-size: 13px; text-transform: uppercase;">
+                            <datalist id="cat-lista-vias"></datalist>
+                        </div>
+                        <div>
+                            <label class="cat-lbl" style="font-size: 10.5px; font-weight: 800; color: var(--accent-blue); text-transform: uppercase; display: block; margin-bottom: 4px;">
+                                Dosis Máx / Día
+                            </label>
+                            <input type="text" id="cat-med-max" class="login-input" placeholder="Ej: 360 (o vacío)" autocomplete="off" style="margin: 0; padding: 8px 10px; font-size: 13px;">
+                        </div>
+                    </div>
+
+                    <div id="cat-aviso-duplicado" style="display: none; font-size: 11.5px; font-weight: 800; color: #ff9800; background: rgba(255,152,0,0.12); border: 1px solid rgba(255,152,0,0.4); padding: 6px 10px; border-radius: 8px;"></div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1.6fr; gap: 10px;">
+                        <div>
+                            <label class="cat-lbl" style="font-size: 10.5px; font-weight: 800; color: var(--accent-blue); text-transform: uppercase; display: block; margin-bottom: 4px;">
+                                Categoría Farmacológica
+                            </label>
+                            <input type="text" id="cat-med-categoria" list="cat-lista-categorias" class="login-input" placeholder="Ej: Bloqueador Canales Calcio" autocomplete="off" style="margin: 0; padding: 8px 10px; font-size: 12.5px; text-align: left;">
+                            <datalist id="cat-lista-categorias"></datalist>
+                        </div>
+                        <div>
+                            <label class="cat-lbl" style="font-size: 10.5px; font-weight: 800; color: var(--accent-blue); text-transform: uppercase; display: block; margin-bottom: 4px;">
+                                Alerta Clínica por Sobredosis (CDSS)
+                            </label>
+                            <input type="text" id="cat-med-alerta" class="login-input" placeholder="Ej: Riesgo de hipotensión severa y bradicardia..." autocomplete="off" style="margin: 0; padding: 8px 10px; font-size: 12.5px; text-align: left;">
+                        </div>
+                    </div>
+
+                    <button type="button" id="cat-btn-guardar" onclick="window.guardarMedicamentoEnCatalogo()" style="width: 100%; padding: 10px; border-radius: 10px; border: none; background: linear-gradient(135deg, #00e676, #00c853); color: #000; font-weight: 900; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                        <span class="material-icons-round" style="font-size: 18px;">cloud_upload</span>
+                        GUARDAR MEDICAMENTO EN FIREBASE
+                    </button>
+                </div>
+
+                <!-- Buscador del catálogo actual -->
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px;">
+                    <input type="text" id="cat-buscar-existente" class="login-input" placeholder="🔍 Buscar en el arsenal actual para revisar o editar..." oninput="window.renderizarListaCatalogoModal()" style="margin: 0; padding: 7px 12px; font-size: 12.5px; text-align: left; flex: 1;">
+                    <span id="cat-contador-total" style="font-size: 11px; font-weight: 800; color: var(--text-muted); white-space: nowrap;"></span>
+                </div>
+
+                <div id="cat-lista-existentes" style="flex: 1; overflow-y: auto; max-height: 230px; margin-top: 8px; display: flex; flex-direction: column; gap: 6px; padding-right: 4px;"></div>
+
+                <div class="modal-actions" style="margin-top: 10px;">
+                    <button type="button" class="btn-entendido" style="width: 100%;" onclick="window.cerrarModalGestionCatalogoMeds()">CERRAR GESTOR</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    // Poblar sugerencias de Vías y Categorías existentes
+    const dlVias = document.getElementById("cat-lista-vias");
+    const viasBase = (window.datosGlobales?.vias?.length > 0)
+        ? window.datosGlobales.vias
+        : ["O", "EV", "SC", "IM", "INH", "TOP", "OFT", "SL", "R", "SNG"];
+    if (dlVias) {
+        dlVias.innerHTML = viasBase.map(v => `<option value="${v}">`).join("");
+    }
+
+    const dlCats = document.getElementById("cat-lista-categorias");
+    if (dlCats && Array.isArray(window.datosGlobales?.catalogo)) {
+        const catsUnicas = Array.from(new Set(
+            window.datosGlobales.catalogo.map(f => (f.categoria || "").trim()).filter(Boolean)
+        )).sort((a, b) => a.localeCompare(b, "es"));
+        dlCats.innerHTML = catsUnicas.map(c => `<option value="${c}">`).join("");
+    }
+
+    window.limpiarFormularioCatalogoMeds();
+    window.renderizarListaCatalogoModal();
+
+    modal.style.display = "flex";
+    setTimeout(() => {
+        modal.classList.add("show");
+        document.getElementById("cat-med-nombre")?.focus();
+    }, 15);
+};
+
+window.cerrarModalGestionCatalogoMeds = function () {
+    const modal = document.getElementById("modal-catalogo-medicamentos");
+    if (!modal) return;
+    modal.classList.remove("show");
+    setTimeout(() => modal.style.display = "none", 250);
+};
+
+window.limpiarFormularioCatalogoMeds = function () {
+    window.medicamentoCatalogoEnEdicion = null;
+    ["cat-med-nombre", "cat-med-via", "cat-med-max", "cat-med-categoria", "cat-med-alerta"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+    });
+    const titulo = document.getElementById("cat-titulo-modo");
+    const btnCancel = document.getElementById("cat-btn-cancelar-edicion");
+    const btnGuardar = document.getElementById("cat-btn-guardar");
+    const avisoDup = document.getElementById("cat-aviso-duplicado");
+
+    if (titulo) {
+        titulo.textContent = "➕ NUEVO MEDICAMENTO";
+        titulo.style.color = "var(--accent-green)";
+    }
+    if (btnCancel) btnCancel.style.display = "none";
+    if (btnGuardar) btnGuardar.innerHTML = `<span class="material-icons-round" style="font-size: 18px;">cloud_upload</span> GUARDAR MEDICAMENTO EN FIREBASE`;
+    if (avisoDup) avisoDup.style.display = "none";
+};
+
+window.normalizarClaveCatalogo = function (texto) {
+    return window.quitarTildes((texto || "").toLowerCase()).replace(/\s+/g, "");
+};
+
+window.verificarDuplicadoCatalogoEnVivo = function () {
+    const inp = document.getElementById("cat-med-nombre");
+    const aviso = document.getElementById("cat-aviso-duplicado");
+    if (!inp || !aviso) return;
+
+    const claveNueva = window.normalizarClaveCatalogo(inp.value);
+    if (!claveNueva || claveNueva.length < 3) {
+        aviso.style.display = "none";
+        return;
+    }
+
+    const claveEditando = window.medicamentoCatalogoEnEdicion
+        ? window.normalizarClaveCatalogo(window.medicamentoCatalogoEnEdicion)
+        : "";
+
+    const existente = (window.datosGlobales?.catalogo || []).find(f => {
+        const k = window.normalizarClaveCatalogo(f.medicamento);
+        return k === claveNueva && k !== claveEditando;
+    });
+
+    if (existente) {
+        aviso.style.display = "block";
+        aviso.innerHTML = `⚠️ Ya existe un medicamento equivalente en el arsenal: <b>${existente.medicamento}</b> (Vía: ${existente.viaPorDefecto || "-"}). Si deseas modificarlo, búscalo abajo y presiona <b>Editar</b>.`;
+    } else {
+        aviso.style.display = "none";
+    }
+};
+
+window.cargarMedicamentoParaEditar = function (nombreCodificado) {
+    const nombreBuscado = decodeURIComponent(nombreCodificado);
+    const item = (window.datosGlobales?.catalogo || []).find(f => f.medicamento === nombreBuscado);
+    if (!item) return;
+
+    window.medicamentoCatalogoEnEdicion = item.medicamento;
+    document.getElementById("cat-med-nombre").value = item.medicamento || "";
+    document.getElementById("cat-med-via").value = item.viaPorDefecto || "";
+    document.getElementById("cat-med-max").value = item.dosisMaxima || "";
+    document.getElementById("cat-med-categoria").value = item.categoria || "";
+    document.getElementById("cat-med-alerta").value = item.alertaSobredosis || "";
+
+    const titulo = document.getElementById("cat-titulo-modo");
+    const btnCancel = document.getElementById("cat-btn-cancelar-edicion");
+    const btnGuardar = document.getElementById("cat-btn-guardar");
+
+    if (titulo) {
+        titulo.textContent = `✏️ EDITANDO: ${item.medicamento.toUpperCase()}`;
+        titulo.style.color = "#ff9800";
+    }
+    if (btnCancel) btnCancel.style.display = "inline-block";
+    if (btnGuardar) btnGuardar.innerHTML = `<span class="material-icons-round" style="font-size: 18px;">save</span> ACTUALIZAR MEDICAMENTO EN FIREBASE`;
+    document.getElementById("cat-aviso-duplicado").style.display = "none";
+    document.getElementById("cat-med-nombre").focus();
+};
+
+window.renderizarListaCatalogoModal = function () {
+    const cont = document.getElementById("cat-lista-existentes");
+    const contador = document.getElementById("cat-contador-total");
+    if (!cont) return;
+
+    const filtro = window.quitarTildes((document.getElementById("cat-buscar-existente")?.value || "").trim().toLowerCase());
+    const catalogo = Array.isArray(window.datosGlobales?.catalogo) ? window.datosGlobales.catalogo : [];
+
+    const filtrados = catalogo.filter(f => {
+        if (!filtro) return true;
+        return window.quitarTildes((f.medicamento || "").toLowerCase()).includes(filtro) ||
+               window.quitarTildes((f.categoria || "").toLowerCase()).includes(filtro);
+    });
+
+    if (contador) contador.textContent = `${filtrados.length} de ${catalogo.length} fármacos`;
+
+    if (filtrados.length === 0) {
+        cont.innerHTML = `<div style="text-align:center; padding:18px; color:var(--text-muted); font-size:12px;">No se encontraron medicamentos con ese criterio.</div>`;
+        return;
+    }
+
+    cont.innerHTML = filtrados.slice(0, 60).map(item => {
+        const encNombre = encodeURIComponent(item.medicamento || "");
+        return `
+            <div class="cat-item-fila" style="display: flex; justify-content: space-between; align-items: center; gap: 10px; background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); padding: 8px 12px; border-radius: 8px; font-size: 12px;">
+                <div style="flex: 1; min-width: 0;">
+                    <div style="font-weight: 800; color: var(--text-main);">
+                        ${item.medicamento}
+                        <span style="margin-left: 6px; font-size: 10.5px; color: var(--accent-blue); background: rgba(64,196,255,0.12); padding: 1px 6px; border-radius: 4px;">Vía: ${item.viaPorDefecto || "-"}</span>
+                        ${item.dosisMaxima ? `<span style="margin-left: 4px; font-size: 10.5px; color: #ff9800; background: rgba(255,152,0,0.12); padding: 1px 6px; border-radius: 4px;">Máx: ${item.dosisMaxima}</span>` : ""}
+                    </div>
+                    <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        ${item.categoria || "Sin categoría"} ${item.alertaSobredosis ? `· ${item.alertaSobredosis}` : ""}
+                    </div>
+                </div>
+                <div style="display: flex; gap: 6px; flex-shrink: 0;">
+                    <button type="button" onclick="window.cargarMedicamentoParaEditar('${encNombre}')" style="background: rgba(64,196,255,0.15); color: var(--accent-blue); border: 1px solid rgba(64,196,255,0.35); border-radius: 6px; padding: 4px 9px; font-size: 10.5px; font-weight: 800; cursor: pointer;">
+                        EDITAR
+                    </button>
+                    <button type="button" onclick="window.eliminarMedicamentoDeCatalogo('${encNombre}')" style="background: rgba(255,82,82,0.14); color: var(--accent-red); border: 1px solid rgba(255,82,82,0.35); border-radius: 6px; padding: 4px 8px; font-size: 10.5px; font-weight: 800; cursor: pointer;">
+                        BORRAR
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join("");
+};
+
+window.guardarMedicamentoEnCatalogo = async function () {
+    if (!window.tienePermisoGestionCatalogo()) return;
+
+    const nombreLimpio = (document.getElementById("cat-med-nombre")?.value || "").replace(/\s+/g, " ").trim();
+    const viaLimpia = (document.getElementById("cat-med-via")?.value || "").trim().toUpperCase();
+    const dosisMaxLimpia = (document.getElementById("cat-med-max")?.value || "").replace(",", ".").trim();
+    const categoriaLimpia = (document.getElementById("cat-med-categoria")?.value || "").replace(/\s+/g, " ").trim();
+    const alertaLimpia = (document.getElementById("cat-med-alerta")?.value || "").replace(/\s+/g, " ").trim();
+
+    if (!nombreLimpio || !viaLimpia) {
+        alert("⚠️ Complete al menos el Nombre del Medicamento y su Vía por Defecto.");
+        return;
+    }
+
+    const btn = document.getElementById("cat-btn-guardar");
+    const htmlOriginal = btn ? btn.innerHTML : "";
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span class="material-icons-round" style="font-size: 18px; animation: spin 1.2s linear infinite;">sync</span> GUARDANDO EN FIRESTORE...`;
+    }
+
+    try {
+        const refCatalogo = doc(window.db, "config_maestra", "catalogo_cdss");
+        const refListas = doc(window.db, "config_maestra", "listas_desplegables");
+
+        // Leer la versión más fresca en la nube para no pisar cambios concurrentes
+        const [snapCat, snapListas] = await Promise.all([getDoc(refCatalogo), getDoc(refListas)]);
+        let farmacos = snapCat.exists() && Array.isArray(snapCat.data().farmacos) ? [...snapCat.data().farmacos] : [];
+        let nombres = snapListas.exists() && Array.isArray(snapListas.data().nombresMedicamentos) ? [...snapListas.data().nombresMedicamentos] : [];
+
+        const claveNueva = window.normalizarClaveCatalogo(nombreLimpio);
+        const claveEditando = window.medicamentoCatalogoEnEdicion
+            ? window.normalizarClaveCatalogo(window.medicamentoCatalogoEnEdicion)
+            : "";
+
+        // Bloquear duplicados reales al crear un medicamento nuevo
+        const yaExiste = farmacos.some(f => {
+            const k = window.normalizarClaveCatalogo(f.medicamento);
+            return k === claveNueva && k !== claveEditando;
+        });
+
+        if (yaExiste) {
+            alert("⚠️ Este medicamento ya existe en el catálogo (coincidencia detectada ignorando espacios/mayúsculas). Búsquelo abajo para editarlo.");
+            return;
+        }
+
+        const nuevoRegistro = {
+            medicamento: nombreLimpio,
+            categoria: categoriaLimpia || "Arsenal Hospitalario",
+            dosisMaxima: dosisMaxLimpia,
+            viaPorDefecto: viaLimpia,
+            alertaSobredosis: alertaLimpia
+        };
+
+        if (window.medicamentoCatalogoEnEdicion) {
+            // Reemplazar en catalogo_cdss
+            const idxCat = farmacos.findIndex(f => f.medicamento === window.medicamentoCatalogoEnEdicion);
+            if (idxCat >= 0) farmacos[idxCat] = nuevoRegistro;
+            else farmacos.push(nuevoRegistro);
+
+            // Reemplazar en listas_desplegables (limpiando el nombre antiguo si cambió)
+            nombres = nombres.filter(n => window.normalizarClaveCatalogo(n) !== claveEditando && window.normalizarClaveCatalogo(n) !== claveNueva);
+            nombres.push(nombreLimpio);
+        } else {
+            farmacos.push(nuevoRegistro);
+            if (!nombres.some(n => window.normalizarClaveCatalogo(n) === claveNueva)) {
+                nombres.push(nombreLimpio);
+            }
+        }
+
+        // Ordenar ambos alfabéticamente
+        farmacos.sort((a, b) => (a.medicamento || "").localeCompare(b.medicamento || "", "es"));
+        nombres.sort((a, b) => a.localeCompare(b, "es"));
+
+        // Guardar de forma sincronizada en Firestore
+        await Promise.all([
+            setDoc(refCatalogo, { farmacos }, { merge: true }),
+            setDoc(refListas, { nombresMedicamentos: nombres }, { merge: true })
+        ]);
+
+        // Actualizar memoria local al instante (disponible de inmediato en la grilla sin recargar)
+        window.datosGlobales.catalogo = farmacos;
+        window.datosGlobales.nombres = nombres;
+
+        const accionTexto = window.medicamentoCatalogoEnEdicion ? "actualizado" : "agregado";
+        window.mostrarToastFarmacia(
+            `<b>${nombreLimpio}</b> (Vía: ${viaLimpia}) fue ${accionTexto} y ya está disponible en la grilla.`,
+            "✅ Arsenal Actualizado"
+        );
+
+        window.limpiarFormularioCatalogoMeds();
+        window.renderizarListaCatalogoModal();
+    } catch (err) {
+        console.error("Error guardando medicamento en catálogo:", err);
+        alert("❌ Error al guardar en Firestore: " + err.message);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = htmlOriginal || `<span class="material-icons-round" style="font-size: 18px;">cloud_upload</span> GUARDAR MEDICAMENTO EN FIREBASE`;
+        }
+    }
+};
+
+window.eliminarMedicamentoDeCatalogo = async function (nombreCodificado) {
+    if (!window.tienePermisoGestionCatalogo()) return;
+    const nombreBorrar = decodeURIComponent(nombreCodificado);
+    if (!confirm(`⚠️ ¿Eliminar "${nombreBorrar}" del catálogo CDSS y de la lista desplegable de todos los usuarios?`)) return;
+
+    try {
+        const refCatalogo = doc(window.db, "config_maestra", "catalogo_cdss");
+        const refListas = doc(window.db, "config_maestra", "listas_desplegables");
+
+        const [snapCat, snapListas] = await Promise.all([getDoc(refCatalogo), getDoc(refListas)]);
+        const claveBorrar = window.normalizarClaveCatalogo(nombreBorrar);
+
+        const farmacos = (snapCat.exists() && Array.isArray(snapCat.data().farmacos) ? snapCat.data().farmacos : [])
+            .filter(f => window.normalizarClaveCatalogo(f.medicamento) !== claveBorrar);
+
+        const nombres = (snapListas.exists() && Array.isArray(snapListas.data().nombresMedicamentos) ? snapListas.data().nombresMedicamentos : [])
+            .filter(n => window.normalizarClaveCatalogo(n) !== claveBorrar);
+
+        await Promise.all([
+            setDoc(refCatalogo, { farmacos }, { merge: true }),
+            setDoc(refListas, { nombresMedicamentos: nombres }, { merge: true })
+        ]);
+
+        window.datosGlobales.catalogo = farmacos;
+        window.datosGlobales.nombres = nombres;
+
+        if (window.medicamentoCatalogoEnEdicion === nombreBorrar) {
+            window.limpiarFormularioCatalogoMeds();
+        }
+        window.renderizarListaCatalogoModal();
+        window.mostrarToastFarmacia(`Se eliminó <b>${nombreBorrar}</b> del arsenal.`, "🗑️ Medicamento Eliminado");
+    } catch (err) {
+        alert("❌ Error al eliminar medicamento: " + err.message);
+    }
+};
+
+setTimeout(() => {
+    window.iniciarBotonCatalogoMedicamentos();
+}, 700);
