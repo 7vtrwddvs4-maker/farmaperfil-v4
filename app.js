@@ -9019,6 +9019,590 @@ window.eliminarMedicamentoDeCatalogo = async function (nombreCodificado) {
     }
 };
 
+// ============================================================================
+// 25. COPILOTO INTERACTIVO PASO A PASO (PERFIL, GESTIÓN, DESPACHO Y CONSOLIDADO)
+// ============================================================================
+window.copilotoEstado = {
+    activo: false,
+    pasoActualId: "paciente",
+    filaActiva: 0,
+    ladoDerecho: false,
+    minimizado: false,
+    ultimoMedDetectado: ""
+};
+
+window.analizarConsejoPotenciaCopiloto = function (nombreMedRaw) {
+    const medOrig = (nombreMedRaw || "").trim();
+    const medNorm = window.quitarTildes(medOrig.toLowerCase());
+
+    if (!medOrig) {
+        return `Ingresa la dosis indicada respetando siempre la unidad en la que viene expresado el medicamento (ej: si es <b>500 mg</b> y la indicación dice <b>1 g</b>, escribe <b>1000 mg</b>).`;
+    }
+
+    const esEnema = medNorm.includes("fleet") || medNorm.includes("enema");
+    const esPomada = ["crema", "pomada", "unguento", "mupirocina", "clotrimazol", "mometasona 0.1", "hidrocortisona 1%", "nistatina 10"].some(k => medNorm.includes(k));
+    const esInhalador = ["salbutamol", "ipratropio", "budesonida", "formoterol", "fluticasona", "brexotide", "tiotropio", "olodaterol"].some(k => medNorm.includes(k));
+    const esLiquido = (typeof DB_LIQUIDOS !== "undefined" && Object.keys(DB_LIQUIDOS).some(k => medNorm.includes(window.quitarTildes(k.toLowerCase())))) ||
+        medNorm.includes("jarabe") || medNorm.includes("suspension") || medNorm.includes("gotas");
+    const esAlbumina = medNorm.includes("albumina");
+    const esHidralazina = medNorm.includes("hidralazina");
+
+    if (esEnema || esPomada) {
+        return `Elegiste <b>${medOrig}</b>. Para esta presentación selecciona únicamente <b>Aplicar</b> en la casilla <b>Dosis</b> y luego elige la frecuencia en Posología (ej: <b>Carga</b> o <b>c/24h</b>).`;
+    }
+
+    if (esInhalador) {
+        return `Elegiste <b>${medOrig}</b> (inhalador). Ingresa la dosis en <b>puff</b> (ej: <b>2 puff</b>). El panel derecho <b>MULTIDOSIS</b> descontará los puffs automáticamente y marcará <b>T</b> los días siguientes.`;
+    }
+
+    if (esLiquido) {
+        return `Elegiste <b>${medOrig}</b> (líquido oral / gotas). Ingresa la dosis en <b>mL</b> o <b>gotas</b> (ej: <b>5 mL</b> o <b>10 gotas</b>). El panel derecho calculará la duración del frasco y cuándo corresponde <b>T</b>.`;
+    }
+
+    if (esAlbumina) {
+        return `Elegiste <b>${medOrig}</b>. Ingresa la dosis en <b>g</b> (ej: <b>10 g</b> o <b>20 g</b>) y su posología. Como tiene protocolo institucional, se abrirá el asistente para seleccionar diagnóstico y confirmar la <b>Receta SIDRA</b>.`;
+    }
+
+    if (esHidralazina) {
+        return `Elegiste <b>${medOrig}</b> (potencia en <b>mg</b>). Escribe la dosis en <b>mg</b> (ej: <b>50 mg</b>). Recuerda que Farmacia la entrega por caja de <b>30 comprimidos</b>: marcará <b>30</b> hoy y llevará el saldo en el panel derecho.`;
+    }
+
+    // Evaluar unidad principal fuera de paréntesis (ej. "Paracetamol 1 g (10 mg/100 mL)" -> "g")
+    const medSinPar = medNorm.replace(/\([^)]*\)/g, "").trim();
+    const matchPotencia = medSinPar.match(/(\d+(?:[.,]\d+)?)\s*(mcg|mg|g|ui|u)\b/i);
+
+    if (matchPotencia) {
+        const valorBase = parseFloat(matchPotencia[1].replace(",", "."));
+        const unidad = matchPotencia[2].toLowerCase();
+
+        if (unidad === "mg") {
+            const ejemploDoble = Math.round(valorBase * 2 * 100) / 100;
+            const notaGramos = valorBase === 500
+                ? `Por ejemplo, si la receta indica <b>1 g</b>, debes escribir <b>1000 mg</b> usando la potencia del medicamento (2 unidades de 500 mg).`
+                : `Por ejemplo, si indican el doble de la concentración, escribe <b>${ejemploDoble} mg</b> (si la receta viene en gramos, conviértela a <b>mg</b> para respetar la potencia del fármaco).`;
+            return `Elegiste <b>${medOrig}</b> (expresado en <b>mg</b>). ${notaGramos}`;
+        }
+
+        if (unidad === "g") {
+            return `Elegiste <b>${medOrig}</b> (concentración principal en <b>g</b>). Escribe la dosis en gramos (ej: <b>${valorBase} g</b> o <b>${valorBase * 2} g</b>); si escribes <b>500 mg</b>, el sistema también lo convertirá automáticamente.`;
+        }
+
+        if (unidad === "mcg") {
+            return `Elegiste <b>${medOrig}</b> (potencia en <b>mcg</b>). Ingresa la dosis exacta en <b>mcg</b>. Si es una infusión continua por peso (ej: Dexmedetomidina), asegúrate de tener registrado el <b>Peso (kg)</b> arriba.`;
+        }
+
+        if (unidad === "ui" || unidad === "u") {
+            return `Elegiste <b>${medOrig}</b> (dosificado en <b>UI</b>). Ingresa el valor en Unidades Internacionales (ej: <b>${valorBase} UI</b> o la dosis indicada en la receta).`;
+        }
+    }
+
+    return `Elegiste <b>${medOrig}</b>. Selecciona o escribe la dosis respetando su unidad principal, o elige <b>BIC</b> si corresponde a bomba de infusión continua.`;
+};
+
+window.COPILOTO_PASOS = [
+    {
+        id: "paciente",
+        bloque: "PERFIL",
+        titulo: "1. Datos del Paciente",
+        selector: ".patient-grid",
+        descripcion: () => `Completa primero los datos clave en la ficha superior: <b>Paciente</b>, <b>Peso (kg)</b> (vital para infusiones), <b>Servicio / Cama</b>, <b>N° Ficha</b>, <b>RUT</b> y <b>Alergias</b>.<br><span style="opacity:0.85;">💡 Apenas llenes el Nombre o presiones Siguiente, pasaremos a estampar la fecha.</span>`
+    },
+    {
+        id: "fecha",
+        bloque: "PERFIL",
+        titulo: "2. Estampar Fecha de Inicio (▶)",
+        selector: ".med-grid thead tr:nth-child(2) th:nth-child(6) .btn-nuevo-dia",
+        descripcion: () => `Presiona el botón verde <b>▶</b> en la primera columna para estampar automáticamente la fecha de hoy y activar el cálculo del Día 1.`
+    },
+    {
+        id: "farmaco",
+        bloque: "PERFIL",
+        titulo: "3. Ingresar el Medicamento",
+        selector: () => `#grillaFila tr[data-row="${window.copilotoEstado.filaActiva}"] input[data-lista="nombres"]`,
+        descripcion: () => `Haz clic en la fila resaltada y escribe un medicamento (por ejemplo, <b>Paracetamol 500 mg</b>) eligiéndolo del menú desplegable.<br><span style="opacity:0.85;">⚡ Al elegirlo, la <b>Vía</b> se completará sola y saltaremos directo a <b>Dosis</b> con instrucciones según su potencia.</span>`
+    },
+    {
+        id: "dosis",
+        bloque: "PERFIL",
+        titulo: "4. Dosis según Potencia del Fármaco",
+        selector: () => `#grillaFila tr[data-row="${window.copilotoEstado.filaActiva}"] input[data-lista="dosis"]`,
+        descripcion: () => {
+            const inpMed = document.querySelector(`#grillaFila tr[data-row="${window.copilotoEstado.filaActiva}"] input[data-lista="nombres"]`);
+            const medActual = inpMed ? inpMed.value.trim() : window.copilotoEstado.ultimoMedDetectado;
+            return window.analizarConsejoPotenciaCopiloto(medActual);
+        }
+    },
+    {
+        id: "posologia",
+        bloque: "PERFIL",
+        titulo: "5. Posología y Cálculo Automático",
+        selector: () => `#grillaFila tr[data-row="${window.copilotoEstado.filaActiva}"] input[data-lista="posologias"]`,
+        descripcion: () => `Ahora elige o escribe la frecuencia (ej: <b>c/8h</b>, <b>c/12h</b>, <b>c/24h</b> o <b>Carga</b>).<br><span style="opacity:0.85;">🔢 El sistema calculará las unidades exactas en la columna de hoy, revisará alertas <b>CDSS</b> (sobredosis/interacciones) y guardará en la nube.</span>`
+    },
+    {
+        id: "despacho_dia",
+        bloque: "PERFIL",
+        titulo: "6. Confirmar Entrega (✓) y Día Siguiente",
+        selector: () => `#grillaFila tr[data-row="${window.copilotoEstado.filaActiva}"] td.cell-day`,
+        descripcion: () => `¡Listo el cálculo! Aquí tienes 3 herramientas clave:<br>• <b>Check (✓):</b> marca el recuadro junto al número cuando ya entregaste el medicamento.<br>• <b>Días / Horas:</b> arriba puedes ajustar despacho por fin de semana o fracciones (6h, 8h, 12h) en turno noche.<br>• <b>Botón ▶ del Día 2+:</b> abre la <b>Conciliación Activa</b> para arrastrar el tratamiento o marcar <b>S/I</b>.`
+    },
+    {
+        id: "gestion_btn",
+        bloque: "GESTIÓN",
+        titulo: "7. Menú Gestión de Cama / Egreso",
+        selector: 'button[onclick="abrirModalGestion()"]',
+        descripcion: () => `¿Necesitas <b>dar de alta</b>, <b>trasladar de servicio/cama</b>, enviar a <b>tránsito</b> o <b>limpiar</b> el perfil? Haz clic en el botón azul <b>GESTIÓN DE CAMA / EGRESO</b>.<br><span style="opacity:0.85;">⚠️ Requisito: la cama debe tener un nombre de paciente escrito para abrir este menú.</span>`
+    },
+    {
+        id: "gestion_modal",
+        bloque: "GESTIÓN",
+        titulo: "8. Acciones de Gestión del Paciente",
+        selector: "#modal-gestion .gestion-opciones",
+        descripcion: () => `Haz clic en cualquiera de las 4 tarjetas y te explicaré paso a paso qué hacer:<br>• <b>Traslado de Cama:</b> mueve o intercambia pacientes entre camas/servicios.<br>• <b>Enviar a Tránsito:</b> libera la cama sin destino fijo (queda en el panel derecho).<br>• <b>Egreso Clínico:</b> registra Alta/Traslado/Fallecimiento y genera comprobante.<br>• <b>Limpiar Perfil:</b> vacía todo o borra solo medicamentos para practicar.`
+    },
+    {
+        id: "gestion_traslado",
+        bloque: "GESTIÓN",
+        titulo: "↳ Guía: Trasladar de Servicio o Cama",
+        selector: "#form-traslado",
+        descripcion: () => `<b>Cómo trasladar:</b><br>1. Selecciona el <b>Servicio Destino</b> y luego la <b>Nueva Cama</b>.<br>2. Si la cama destino está ocupada, el sistema te avisará y te permitirá <b>INTERCAMBIAR</b> ambos pacientes automáticamente.<br>3. Presiona <b>TRASLADAR PACIENTE</b> para mover el historial completo.`
+    },
+    {
+        id: "gestion_transito",
+        bloque: "GESTIÓN",
+        titulo: "↳ Guía: Enviar a Tránsito y Rescatar",
+        selector: "#btn-ejecutar-gestion",
+        descripcion: () => `<b>Cómo usar Tránsito:</b><br>1. Presiona <b>ENVIAR A TRÁNSITO</b> para liberar esta cama sin perder el perfil.<br>2. El paciente aparecerá en la pestaña <b>PACIENTE EN TRÁNSITO</b> del panel derecho.<br>3. Cuando tenga cama asignada, sitúate en esa cama vacía y presiona <b>RESCATAR</b> (o <b>ALTA</b> si finalmente egresó).`
+    },
+    {
+        id: "gestion_egreso",
+        bloque: "GESTIÓN",
+        titulo: "↳ Guía: Dar de Alta / Egreso Clínico",
+        selector: "#form-egreso",
+        descripcion: () => `<b>Cómo dar de alta:</b><br>1. Selecciona el motivo (<b>Alta Médica</b>, Traslado externo, Fallecimiento o Error).<br>2. Presiona <b>ARCHIVAR EGRESO</b>: el perfil se guardará en el <b>Archivo Histórico</b> (solo lectura) y liberará la cama.<br>3. Al finalizar, puedes aceptar imprimir el <b>Comprobante de Alta</b> con firmas de retiro.`
+    },
+    {
+        id: "gestion_limpiar",
+        bloque: "GESTIÓN",
+        titulo: "↳ Guía: Limpiar Perfil",
+        selector: "#form-limpiar",
+        descripcion: () => `<b>Opciones de limpieza:</b><br>• <b>Vaciar Todo el Perfil:</b> elimina paciente y medicamentos de esta cama en la nube.<br>• <b>SÓLO borrar Medicamentos:</b> mantiene los datos del paciente y deja limpia la grilla y fechas (ideal para practicar o reiniciar esquema).`
+    },
+    {
+        id: "despacho_btn",
+        bloque: "DESPACHO",
+        titulo: "9. Módulo de Despacho (Bodega)",
+        selector: 'button[onclick="abrirDespachoModal()"]',
+        descripcion: () => `Para registrar entregas masivas de <b>Nutriciones</b>, <b>Soluciones/Sueros</b> y <b>Stock Clínico</b> por servicio, haz clic en el botón verde <b>MÓDULO DE DESPACHO</b>.`
+    },
+    {
+        id: "despacho_modal",
+        bloque: "DESPACHO",
+        titulo: "10. Uso del Módulo de Despacho",
+        selector: "#modalDespachoBox .desp-top-bar",
+        descripcion: () => `<b>Flujo dentro del Módulo de Despacho:</b><br>1. Elige el <b>Servicio</b> arriba a la derecha (ej: UCI Norte, Medicina).<br>2. Cambia entre <b>Nutriciones</b>, <b>Soluciones</b> y <b>Stock Clínico</b>; usa <b>− / +</b> o haz clic en el número para abrir el teclado táctil.<br>3. Entra a <b>HOJA DE RUTA</b> para ver el total consolidado e <b>Imprimir Ruta</b>. Al terminar el día puedes limpiar con <b>Borrar Día</b>.`
+    },
+    {
+        id: "consolidado_btn",
+        bloque: "CONSOLIDADO",
+        titulo: "11. Consolidado de Servicio (Rebaja Stock)",
+        selector: 'button[onclick="window.abrirModalConsolidadoServicio()"]',
+        descripcion: () => `Al final del turno, haz clic en el botón morado <b>CONSOLIDADO SERVICIO</b> para sumar automáticamente todo lo despachado en todas las camas de un servicio.`
+    },
+    {
+        id: "consolidado_modal",
+        bloque: "CONSOLIDADO",
+        titulo: "12. Planilla de Cargo y Rebaja de Stock",
+        selector: "#modal-consolidado-servicio .modal-container",
+        descripcion: () => `<b>Cómo obtener la rebaja de stock:</b><br>1. Verifica el <b>Servicio</b> y la <b>Fecha a Rebajar</b> arriba (por defecto toma hoy).<br>2. El sistema suma solo entregas reales e ignora automáticamente <b>T</b>, <b>S/I</b> y guiones.<br>3. Presiona <b>IMPRIMIR HOJA DE CARGO / REBAJA DE STOCK</b> para generar la planilla con desglose por cama y casilla de digitación.`
+    }
+];
+
+window.limpiarFocoCopiloto = function () {
+    document.querySelectorAll(".copiloto-foco").forEach(el => el.classList.remove("copiloto-foco"));
+};
+
+window.obtenerIndicePasoCopiloto = function (idPaso) {
+    return window.COPILOTO_PASOS.findIndex(p => p.id === idPaso);
+};
+
+window.irAPasoCopiloto = function (idPaso) {
+    const paso = window.COPILOTO_PASOS.find(p => p.id === idPaso);
+    if (!paso) return;
+
+    window.copilotoEstado.activo = true;
+    window.copilotoEstado.pasoActualId = paso.id;
+    window.copilotoEstado.minimizado = false;
+
+    window.asegurarWidgetCopiloto();
+    window.renderizarWidgetCopiloto();
+    window.aplicarFocoElementoCopiloto(paso);
+};
+
+window.aplicarFocoElementoCopiloto = function (paso) {
+    window.limpiarFocoCopiloto();
+    if (!paso || !paso.selector) return;
+
+    const sel = typeof paso.selector === "function" ? paso.selector() : paso.selector;
+    const target = document.querySelector(sel);
+    if (!target) return;
+
+    target.classList.add("copiloto-foco");
+
+    // Evitar desplazar la pantalla si estamos dentro de un modal ya visible
+    const enModal = target.closest(".modal-overlay");
+    if (!enModal) {
+        try {
+            target.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+        } catch (e) { }
+    }
+};
+
+window.navegarPasoCopiloto = function (delta) {
+    // Saltar los sub-pasos internos de Gestión (gestion_traslado, etc.) al usar Atrás / Siguiente manual
+    const secuenciaPrincipal = [
+        "paciente", "fecha", "farmaco", "dosis", "posologia", "despacho_dia",
+        "gestion_btn", "despacho_btn", "consolidado_btn"
+    ];
+
+    let actual = window.copilotoEstado.pasoActualId;
+    if (actual.startsWith("gestion_")) actual = "gestion_btn";
+    else if (actual === "despacho_modal") actual = "despacho_btn";
+    else if (actual === "consolidado_modal") actual = "consolidado_btn";
+
+    const idx = secuenciaPrincipal.indexOf(actual);
+    const nuevoIdx = Math.max(0, Math.min(secuenciaPrincipal.length - 1, (idx === -1 ? 0 : idx) + delta));
+    window.irAPasoCopiloto(secuenciaPrincipal[nuevoIdx]);
+};
+
+window.asegurarWidgetCopiloto = function () {
+    let widget = document.getElementById("copiloto-farmaperfil");
+    if (widget) return widget;
+
+    widget = document.createElement("div");
+    widget.id = "copiloto-farmaperfil";
+    widget.innerHTML = `
+        <div class="copiloto-header">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span class="material-icons-round" style="color: var(--accent-green); font-size: 20px;">assistant</span>
+                <span id="copiloto-badge-bloque" class="copiloto-badge">GUÍA ACTIVA</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:4px;">
+                <button type="button" class="copiloto-icon-btn" onclick="window.alternarLadoCopiloto()" title="Mover a la izquierda / derecha">
+                    <span class="material-icons-round" style="font-size:16px;">swap_horiz</span>
+                </button>
+                <button type="button" class="copiloto-icon-btn" onclick="window.alternarMinimizarCopiloto()" title="Minimizar / Expandir">
+                    <span class="material-icons-round" id="copiloto-icono-min" style="font-size:16px;">remove</span>
+                </button>
+                <button type="button" class="copiloto-icon-btn copiloto-btn-close" onclick="window.detenerCopilotoInteractivo()" title="Cerrar guía interactiva">
+                    <span class="material-icons-round" style="font-size:16px;">close</span>
+                </button>
+            </div>
+        </div>
+        <div id="copiloto-cuerpo" class="copiloto-cuerpo">
+            <div id="copiloto-titulo" class="copiloto-titulo"></div>
+            <div id="copiloto-texto" class="copiloto-texto"></div>
+            <div class="copiloto-atajos">
+                <button type="button" onclick="window.irAPasoCopiloto('paciente')" data-bloque="PERFIL">Perfil</button>
+                <button type="button" onclick="window.irAPasoCopiloto('gestion_btn')" data-bloque="GESTIÓN">Alta/Traslado</button>
+                <button type="button" onclick="window.irAPasoCopiloto('despacho_btn')" data-bloque="DESPACHO">Despacho</button>
+                <button type="button" onclick="window.irAPasoCopiloto('consolidado_btn')" data-bloque="CONSOLIDADO">Consolidado</button>
+            </div>
+            <div class="copiloto-footer">
+                <button type="button" class="copiloto-nav-btn" onclick="window.navegarPasoCopiloto(-1)">◀ Atrás</button>
+                <button type="button" class="copiloto-nav-btn primary" onclick="window.navegarPasoCopiloto(1)">Siguiente ▶</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(widget);
+    return widget;
+};
+
+window.renderizarWidgetCopiloto = function () {
+    const widget = document.getElementById("copiloto-farmaperfil");
+    if (!widget) return;
+
+    const paso = window.COPILOTO_PASOS.find(p => p.id === window.copilotoEstado.pasoActualId);
+    if (!paso) return;
+
+    widget.style.display = "flex";
+    widget.classList.toggle("lado-derecho", window.copilotoEstado.ladoDerecho);
+    widget.classList.toggle("minimizado", window.copilotoEstado.minimizado);
+
+    const badge = document.getElementById("copiloto-badge-bloque");
+    const titulo = document.getElementById("copiloto-titulo");
+    const texto = document.getElementById("copiloto-texto");
+    const iconoMin = document.getElementById("copiloto-icono-min");
+
+    if (badge) badge.textContent = `GUÍA · ${paso.bloque}`;
+    if (titulo) titulo.textContent = paso.titulo;
+    if (texto) texto.innerHTML = paso.descripcion();
+    if (iconoMin) iconoMin.textContent = window.copilotoEstado.minimizado ? "open_in_full" : "remove";
+
+    widget.querySelectorAll(".copiloto-atajos button").forEach(btn => {
+        btn.classList.toggle("activo", btn.dataset.bloque === paso.bloque);
+    });
+};
+
+window.alternarLadoCopiloto = function () {
+    window.copilotoEstado.ladoDerecho = !window.copilotoEstado.ladoDerecho;
+    window.renderizarWidgetCopiloto();
+};
+
+window.alternarMinimizarCopiloto = function () {
+    window.copilotoEstado.minimizado = !window.copilotoEstado.minimizado;
+    window.renderizarWidgetCopiloto();
+};
+
+window.detenerCopilotoInteractivo = function () {
+    window.copilotoEstado.activo = false;
+    window.limpiarFocoCopiloto();
+    const widget = document.getElementById("copiloto-farmaperfil");
+    if (widget) widget.style.display = "none";
+};
+
+// ============================================================================
+// SENSORES EN TIEMPO REAL DEL COPILOTO (REACCIONAN A CADA ACCIÓN DEL USUARIO)
+// ============================================================================
+window.registrarSensoresCopiloto = function () {
+    if (window._copilotoListenersRegistrados) return;
+    window._copilotoListenersRegistrados = true;
+
+    // 1. Detectar clics en botones de Fecha, Gestión de Cama, Despacho y Consolidado
+    document.addEventListener("click", function (e) {
+        if (!window.copilotoEstado.activo) return;
+        const target = e.target;
+
+        // Botón ▶ de fecha Día 1
+        if (target.closest(".med-grid thead tr:nth-child(2) th:nth-child(6) .btn-nuevo-dia")) {
+            setTimeout(() => {
+                if (window.copilotoEstado.activo && window.copilotoEstado.pasoActualId === "fecha") {
+                    window.irAPasoCopiloto("farmaco");
+                    const inpMed = document.querySelector(`#grillaFila tr[data-row="${window.copilotoEstado.filaActiva}"] input[data-lista="nombres"]`);
+                    if (inpMed) inpMed.focus();
+                }
+            }, 150);
+            return;
+        }
+
+        // Botón GESTIÓN DE CAMA / EGRESO -> detectar si se abrió #modal-gestion
+        if (target.closest('button[onclick="abrirModalGestion()"]')) {
+            setTimeout(() => {
+                const modalGest = document.getElementById("modal-gestion");
+                if (window.copilotoEstado.activo && modalGest && modalGest.style.display === "flex") {
+                    window.irAPasoCopiloto("gestion_modal");
+                }
+            }, 120);
+            return;
+        }
+
+        // Tarjetas internas de Gestión de Paciente (Traslado / Tránsito / Egreso / Limpiar)
+        const cardGestion = target.closest("#card-traslado, #card-transito, #card-egreso, #card-limpiar");
+        if (cardGestion) {
+            const mapaCards = {
+                "card-traslado": "gestion_traslado",
+                "card-transito": "gestion_transito",
+                "card-egreso": "gestion_egreso",
+                "card-limpiar": "gestion_limpiar"
+            };
+            const destino = mapaCards[cardGestion.id];
+            if (destino) setTimeout(() => window.irAPasoCopiloto(destino), 80);
+            return;
+        }
+
+        // Botón MÓDULO DE DESPACHO -> detectar apertura de #modalDespachoOverlay
+        if (target.closest('button[onclick="abrirDespachoModal()"]')) {
+            setTimeout(() => {
+                const modalDesp = document.getElementById("modalDespachoOverlay");
+                if (window.copilotoEstado.activo && modalDesp && modalDesp.style.display === "flex") {
+                    window.irAPasoCopiloto("despacho_modal");
+                }
+            }, 150);
+            return;
+        }
+
+        // Botón CONSOLIDADO SERVICIO -> detectar apertura de #modal-consolidado-servicio
+        if (target.closest('button[onclick="window.abrirModalConsolidadoServicio()"]')) {
+            setTimeout(() => {
+                const modalCons = document.getElementById("modal-consolidado-servicio");
+                if (window.copilotoEstado.activo && modalCons && modalCons.style.display === "flex") {
+                    window.irAPasoCopiloto("consolidado_modal");
+                }
+            }, 180);
+            return;
+        }
+    }, true);
+
+    // 2. Detectar selección de medicamento, dosis y posología en cualquier fila de la grilla
+    document.getElementById("grillaFila")?.addEventListener("change", function (e) {
+        if (!window.copilotoEstado.activo) return;
+        const inp = e.target;
+        if (!inp || inp.tagName !== "INPUT") return;
+
+        const fila = inp.closest("tr");
+        if (!fila) return;
+        const rowId = parseInt(fila.dataset.row, 10);
+        if (!isNaN(rowId)) window.copilotoEstado.filaActiva = rowId;
+
+        const listId = inp.getAttribute("data-lista");
+
+        if (listId === "nombres" && inp.value.trim() !== "") {
+            window.copilotoEstado.ultimoMedDetectado = inp.value.trim();
+            setTimeout(() => window.irAPasoCopiloto("dosis"), 80);
+        } else if (listId === "dosis" && inp.value.trim() !== "") {
+            setTimeout(() => window.irAPasoCopiloto("posologia"), 80);
+        } else if (listId === "posologias" && inp.value.trim() !== "") {
+            setTimeout(() => window.irAPasoCopiloto("despacho_dia"), 120);
+        }
+    });
+
+    // 3. Si el usuario hace clic directamente en Dosis de una fila que ya tiene fármaco, actualizar el consejo de potencia al instante
+    document.getElementById("grillaFila")?.addEventListener("focusin", function (e) {
+        if (!window.copilotoEstado.activo) return;
+        const inp = e.target;
+        if (!inp || inp.tagName !== "INPUT") return;
+
+        const fila = inp.closest("tr");
+        if (!fila) return;
+        const rowId = parseInt(fila.dataset.row, 10);
+        if (!isNaN(rowId)) window.copilotoEstado.filaActiva = rowId;
+
+        const listId = inp.getAttribute("data-lista");
+        const medNombre = fila.querySelector('input[data-lista="nombres"]')?.value.trim() || "";
+
+        if (listId === "dosis" && medNombre) {
+            window.copilotoEstado.ultimoMedDetectado = medNombre;
+            window.irAPasoCopiloto("dosis");
+        } else if (listId === "posologias" && medNombre && fila.querySelector('input[data-lista="dosis"]')?.value.trim()) {
+            window.irAPasoCopiloto("posologia");
+        }
+    });
+
+    // 4. Cuando termine de ingresar los datos del paciente (ej. RUT o Diagnóstico), invitar a estampar la fecha si está en el Paso 1
+    document.querySelector(".patient-grid")?.addEventListener("change", function (e) {
+        if (!window.copilotoEstado.activo || window.copilotoEstado.pasoActualId !== "paciente") return;
+        const tieneNombre = (document.getElementById("paciente")?.value || "").trim().length >= 3;
+        const tieneFecha = (document.querySelector(".header-fecha")?.value || "").trim() !== "";
+        if (tieneNombre && !tieneFecha && (e.target.id === "rut" || e.target.id === "diagnostico" || e.target.id === "ficha")) {
+            window.irAPasoCopiloto("fecha");
+        }
+    });
+};
+
+// ============================================================================
+// SELECTOR DEL BOTÓN DE AYUDA (?) — INTEGRA COPILOTO + RECORRIDO RÁPIDO
+// ============================================================================
+const _iniciarTourDriverBase = window.iniciarTutorialFarmaPerfil;
+
+window.abrirSelectorGuiaInteractiva = function () {
+    let modal = document.getElementById("modal-selector-guia");
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "modal-selector-guia";
+        modal.className = "modal-overlay";
+        modal.style.cssText = "z-index: 999999999; display: none;";
+        modal.innerHTML = `
+            <div class="modal-container" style="width: 640px; max-width: 95vw;">
+                <div class="modal-header" style="justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-border); padding-bottom: 12px;">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <span class="material-icons-round icon" style="color: var(--accent-green); font-size: 38px; background: rgba(0,230,118,0.12); padding: 10px; border-radius: 50%;">school</span>
+                        <div>
+                            <div style="font-size: 18px; font-weight: 900; color: var(--text-main); text-transform: uppercase;">CENTRO DE AYUDA INTERACTIVA</div>
+                            <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">Elige el copiloto paso a paso en vivo o salta directo a la acción que necesitas realizar.</div>
+                        </div>
+                    </div>
+                    <button type="button" onclick="window.cerrarSelectorGuiaInteractiva()" style="background: rgba(255,82,82,0.15); color: var(--accent-red); border: none; border-radius: 50%; width: 34px; height: 34px; cursor: pointer; display:flex; align-items:center; justify-content:center;">
+                        <span class="material-icons-round">close</span>
+                    </button>
+                </div>
+
+                <button type="button" class="guia-opcion-principal" onclick="window.iniciarCopilotoDesde('paciente')">
+                    <span class="material-icons-round" style="font-size: 28px;">assistant</span>
+                    <div style="text-align:left; flex:1;">
+                        <div style="font-size: 14px; font-weight: 900;">COPILOTO INTERACTIVO PASO A PASO (RECOMENDADO)</div>
+                        <div style="font-size: 11.5px; opacity: 0.9; font-weight: 600; margin-top: 2px;">Te acompaña en vivo mientras llenas un perfil, adapta las indicaciones según la potencia del fármaco (mg/g/mL) y explica todos los módulos.</div>
+                    </div>
+                    <span class="material-icons-round">arrow_forward</span>
+                </button>
+
+                <div style="font-size: 11px; font-weight: 900; color: var(--accent-blue); text-transform: uppercase; letter-spacing: 0.5px;">
+                    O ir directo a una tarea específica:
+                </div>
+
+                <div class="guia-grid-accesos">
+                    <div class="guia-card-acceso" onclick="window.iniciarCopilotoDesde('farmaco')">
+                        <span class="material-icons-round" style="color: var(--accent-green);">vaccines</span>
+                        <b>Ingresar Fármacos y Potencia</b>
+                        <span>Cómo escribir dosis en mg/g/mL, posología y conciliar días.</span>
+                    </div>
+                    <div class="guia-card-acceso" onclick="window.iniciarCopilotoDesde('gestion_btn')">
+                        <span class="material-icons-round" style="color: var(--accent-blue);">manage_accounts</span>
+                        <b>Alta, Traslado, Tránsito o Limpiar</b>
+                        <span>Guía en vivo dentro del menú Gestión de Cama / Egreso.</span>
+                    </div>
+                    <div class="guia-card-acceso" onclick="window.iniciarCopilotoDesde('despacho_btn')">
+                        <span class="material-icons-round" style="color: #34c759;">local_shipping</span>
+                        <b>Módulo de Despacho</b>
+                        <span>Nutriciones, soluciones, stock clínico y Hoja de Ruta.</span>
+                    </div>
+                    <div class="guia-card-acceso" onclick="window.iniciarCopilotoDesde('consolidado_btn')">
+                        <span class="material-icons-round" style="color: #b388ff;">fact_check</span>
+                        <b>Consolidado de Servicio</b>
+                        <span>Sumatoria por servicio e impresión de Rebaja de Stock.</span>
+                    </div>
+                </div>
+
+                <div class="modal-actions" style="margin-top: 6px; justify-content: space-between;">
+                    <button type="button" class="btn-entendido" onclick="window.ejecutarTourRapidoClasico()">
+                        VER RECORRIDO VISUAL RÁPIDO
+                    </button>
+                    <button type="button" class="btn-entendido" onclick="window.cerrarSelectorGuiaInteractiva()">
+                        CERRAR
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    modal.style.display = "flex";
+    setTimeout(() => modal.classList.add("show"), 15);
+};
+
+window.cerrarSelectorGuiaInteractiva = function () {
+    const modal = document.getElementById("modal-selector-guia");
+    if (!modal) return;
+    modal.classList.remove("show");
+    setTimeout(() => modal.style.display = "none", 220);
+};
+
+window.iniciarCopilotoDesde = function (pasoInicial = "paciente") {
+    window.cerrarSelectorGuiaInteractiva();
+    window.registrarSensoresCopiloto();
+    window.copilotoEstado.filaActiva = 0;
+
+    // Si elige iniciar en "farmaco", buscar la primera fila vacía para practicar sin pisar una fila llena
+    if (pasoInicial === "farmaco") {
+        const filas = Array.from(document.querySelectorAll("#grillaFila tr"));
+        const filaLibre = filas.find(f => !f.querySelector('input[data-lista="nombres"]')?.value.trim());
+        if (filaLibre) window.copilotoEstado.filaActiva = parseInt(filaLibre.dataset.row, 10) || 0;
+    }
+
+    window.irAPasoCopiloto(pasoInicial);
+};
+
+window.ejecutarTourRapidoClasico = function () {
+    window.cerrarSelectorGuiaInteractiva();
+    window.detenerCopilotoInteractivo();
+    if (typeof _iniciarTourDriverBase === "function") {
+        _iniciarTourDriverBase();
+    }
+};
+
+// Reemplaza la acción del botón "?" para abrir el Centro de Ayuda Interactiva
+window.iniciarTutorialFarmaPerfil = function () {
+    window.abrirSelectorGuiaInteractiva();
+};
 setTimeout(() => {
     window.iniciarBotonCatalogoMedicamentos();
 }, 700);
