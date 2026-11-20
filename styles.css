@@ -1670,3 +1670,265 @@ body.light-theme .input-nuevo-concil {
         border: 1px solid #cbd5e1 !important;
     }
 }
+
+/* =========================================================
+   COPILOTO INTERACTIVO Y CENTRO DE AYUDA (PANTALLA)
+   ========================================================= */
+@media screen {
+    #copiloto-farmaperfil {
+        position: fixed;
+        bottom: 22px;
+        left: 22px;
+        width: 370px;
+        max-width: calc(100vw - 44px);
+        z-index: 999999998;
+        display: none;
+        flex-direction: column;
+        border-radius: 16px;
+        background: rgba(15, 29, 37, 0.96);
+        border: 1.5px solid var(--accent-green);
+        box-shadow: 0 18px 45px rgba(0, 0, 0, 0.55);
+        color: #ffffff;
+        overflow: hidden;
+        transition: all 0.25s ease;
+    }
+
+    #copiloto-farmaperfil.lado-derecho {
+        left: auto;
+        right: 22px;
+        bottom: 92px; /* Por encima del botón flotante Calculadora */
+    }
+
+    #copiloto-farmaperfil.minimizado .copiloto-cuerpo {
+        display: none;
+    }
+    #copiloto-farmaperfil.minimizado {
+        width: 240px;
+    }
+
+    body.light-theme #copiloto-farmaperfil {
+        background: #ffffff;
+        border-color: #0284c7;
+        color: #0f172a;
+        box-shadow: 0 16px 38px rgba(15, 23, 42, 0.22);
+    }
+
+    .copiloto-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 14px;
+        background: rgba(0, 230, 118, 0.1);
+        border-bottom: 1px solid var(--glass-border);
+    }
+    body.light-theme .copiloto-header {
+        background: #f0f9ff;
+        border-bottom-color: #cbd5e1;
+    }
+
+    .copiloto-badge {
+        font-size: 10.5px;
+        font-weight: 900;
+        letter-spacing: 0.6px;
+        color: var(--accent-green);
+        text-transform: uppercase;
+    }
+    body.light-theme .copiloto-badge {
+        color: #0369a1;
+    }
+
+    .copiloto-icon-btn {
+        background: rgba(255, 255, 255, 0.1);
+        border: none;
+        color: inherit;
+        width: 26px;
+        height: 26px;
+        border-radius: 6px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: 0.15s;
+    }
+    .copiloto-icon-btn:hover {
+        background: rgba(64, 196, 255, 0.25);
+    }
+    .copiloto-btn-close:hover {
+        background: rgba(255, 82, 82, 0.85);
+        color: #ffffff;
+    }
+    body.light-theme .copiloto-icon-btn {
+        background: #e2e8f0;
+        color: #334155;
+    }
+
+    .copiloto-cuerpo {
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .copiloto-titulo {
+        font-size: 14.5px;
+        font-weight: 900;
+        color: var(--accent-blue);
+    }
+    body.light-theme .copiloto-titulo {
+        color: #0369a1;
+    }
+
+    .copiloto-texto {
+        font-size: 12.5px;
+        line-height: 1.5;
+        color: #e2e8f0;
+    }
+    body.light-theme .copiloto-texto {
+        color: #334155;
+    }
+
+    .copiloto-atajos {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 5px;
+        padding-top: 6px;
+        border-top: 1px dashed var(--glass-border);
+    }
+    .copiloto-atajos button {
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--glass-border);
+        color: var(--text-muted);
+        border-radius: 6px;
+        padding: 5px 4px;
+        font-size: 10px;
+        font-weight: 800;
+        cursor: pointer;
+        transition: 0.15s;
+    }
+    .copiloto-atajos button.activo,
+    .copiloto-atajos button:hover {
+        background: rgba(64, 196, 255, 0.18);
+        border-color: var(--accent-blue);
+        color: var(--accent-blue);
+    }
+    body.light-theme .copiloto-atajos button {
+        background: #f8fafc;
+        border-color: #cbd5e1;
+        color: #475569;
+    }
+    body.light-theme .copiloto-atajos button.activo {
+        background: #e0f2fe;
+        border-color: #0284c7;
+        color: #0369a1;
+    }
+
+    .copiloto-footer {
+        display: flex;
+        gap: 8px;
+        margin-top: 2px;
+    }
+    .copiloto-nav-btn {
+        flex: 1;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid var(--glass-border);
+        background: rgba(255, 255, 255, 0.08);
+        color: inherit;
+        font-size: 11.5px;
+        font-weight: 800;
+        cursor: pointer;
+        transition: 0.15s;
+    }
+    .copiloto-nav-btn.primary {
+        background: linear-gradient(135deg, #00e676, #00c853);
+        color: #000000;
+        border: none;
+        font-weight: 900;
+    }
+    body.light-theme .copiloto-nav-btn:not(.primary) {
+        background: #f1f5f9;
+        border-color: #cbd5e1;
+        color: #0f172a;
+    }
+
+    /* Anillo pulsante de enfoque sin bloquear clics ni escritura */
+    @keyframes pulsoCopiloto {
+        0% { box-shadow: 0 0 0 0 rgba(0, 230, 118, 0.75); }
+        70% { box-shadow: 0 0 0 10px rgba(0, 230, 118, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(0, 230, 118, 0); }
+    }
+    .copiloto-foco {
+        outline: 2.5px solid #00e676 !important;
+        outline-offset: 2px !important;
+        animation: pulsoCopiloto 1.6s infinite !important;
+        position: relative;
+        z-index: 30;
+    }
+
+    /* Tarjetas del Selector de Ayuda */
+    .guia-opcion-principal {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 15px 18px;
+        border-radius: 14px;
+        border: none;
+        background: linear-gradient(135deg, #00e676, #00c853);
+        color: #000000;
+        cursor: pointer;
+        box-shadow: 0 8px 20px rgba(0, 230, 118, 0.25);
+        transition: transform 0.2s;
+    }
+    .guia-opcion-principal:hover {
+        transform: translateY(-2px);
+    }
+
+    .guia-grid-accesos {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+    .guia-card-acceso {
+        background: var(--panel-bg);
+        border: 1px solid var(--glass-border);
+        border-radius: 12px;
+        padding: 12px 14px;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        transition: 0.2s;
+    }
+    .guia-card-acceso:hover {
+        border-color: var(--accent-blue);
+        background: rgba(64, 196, 255, 0.1);
+        transform: translateY(-2px);
+    }
+    .guia-card-acceso b {
+        font-size: 12.5px;
+        color: var(--text-main);
+    }
+    .guia-card-acceso span:last-child {
+        font-size: 11px;
+        color: var(--text-muted);
+        line-height: 1.35;
+    }
+    body.light-theme .guia-card-acceso {
+        background: #f8fafc;
+        border-color: #cbd5e1;
+    }
+}
+
+/* Nunca mostrar la guía ni sus halos al imprimir */
+@media print {
+    #copiloto-farmaperfil,
+    #modal-selector-guia {
+        display: none !important;
+    }
+    .copiloto-foco {
+        outline: none !important;
+        box-shadow: none !important;
+        animation: none !important;
+    }
+}
