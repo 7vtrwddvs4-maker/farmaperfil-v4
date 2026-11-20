@@ -9603,6 +9603,3 @@ window.ejecutarTourRapidoClasico = function () {
 window.iniciarTutorialFarmaPerfil = function () {
     window.abrirSelectorGuiaInteractiva();
 };
-setTimeout(() => {
-    window.iniciarBotonCatalogoMedicamentos();
-}, 700);
