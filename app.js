@@ -8620,7 +8620,7 @@ window.iniciarBotonCatalogoMedicamentos = function () {
     const esQF = typeof window.esUsuarioRolQF === "function" ? window.esUsuarioRolQF() : false;
     const puedeGestionar = window.tienePermisoGestionCatalogo();
 
-    btnCat.style.setProperty("display", puedeGestionar ? "flex" : "none", "important");
+    btnCat.style.display = puedeGestionar ? "flex" : "none";
     btnCat.style.setProperty("right", esQF ? "240px" : "195px", "important");
 
     const userInfoHeader = document.querySelector(".user-info-header");
