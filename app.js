@@ -8588,11 +8588,14 @@ window.medicamentoCatalogoEnEdicion = null;
 
 window.tienePermisoGestionCatalogo = function () {
     const sesion = JSON.parse(sessionStorage.getItem("FarmaPerfil_Sesion") || "{}");
-    if (!sesion || (!sesion.rol && !sesion.nombre)) return false;
+    const nombreSesion = (sesion.nombre || document.getElementById("displayUserName")?.textContent || "").trim();
+    const rolSesion = (sesion.rol || document.getElementById("displayUserRole")?.textContent || "").trim();
 
-    const esQF = sesion.rol === "Químico Farmacéutico";
-    const nombreNorm = window.quitarTildes((sesion.nombre || "").trim().toUpperCase());
-    const esFrancisco = nombreNorm.includes("FRANCISCO BARRA");
+    const rolNorm = window.quitarTildes(rolSesion.toLowerCase());
+    const nombreNorm = window.quitarTildes(nombreSesion.toUpperCase()).replace(/\s+/g, " ");
+
+    const esQF = rolNorm.includes("quimico");
+    const esFrancisco = nombreNorm.includes("FRANCISCO") && nombreNorm.includes("BARRA");
     const tieneFlagAdmin = sesion.adminCatalogo === true;
 
     return esQF || esFrancisco || tieneFlagAdmin;
@@ -8600,8 +8603,11 @@ window.tienePermisoGestionCatalogo = function () {
 
 window.iniciarBotonCatalogoMedicamentos = function () {
     const titleCell = document.querySelector(".header-cell.title-cell");
-    if (titleCell && !document.getElementById("btnCatalogoMedsHeader")) {
-        const btnCat = document.createElement("button");
+    if (!titleCell) return;
+
+    let btnCat = document.getElementById("btnCatalogoMedsHeader");
+    if (!btnCat) {
+        btnCat = document.createElement("button");
         btnCat.id = "btnCatalogoMedsHeader";
         btnCat.className = "theme-toggle-btn";
         btnCat.style.cssText = "right: 195px; display: none;";
@@ -8611,10 +8617,31 @@ window.iniciarBotonCatalogoMedicamentos = function () {
         titleCell.appendChild(btnCat);
     }
 
-    if (typeof window.actualizarVisibilidadBotonesInfoQF === "function") {
-        window.actualizarVisibilidadBotonesInfoQF();
+    const esQF = typeof window.esUsuarioRolQF === "function" ? window.esUsuarioRolQF() : false;
+    const puedeGestionar = window.tienePermisoGestionCatalogo();
+
+    btnCat.style.setProperty("display", puedeGestionar ? "flex" : "none", "important");
+    btnCat.style.setProperty("right", esQF ? "240px" : "195px", "important");
+
+    const userInfoHeader = document.querySelector(".user-info-header");
+    titleCell.classList.toggle("modo-cabecera-qf", esQF || puedeGestionar);
+    if (userInfoHeader) {
+        let margenDerecho = "195px";
+        if (esQF && puedeGestionar) margenDerecho = "290px";
+        else if (esQF || puedeGestionar) margenDerecho = "245px";
+        userInfoHeader.style.setProperty("right", margenDerecho, "important");
     }
 };
+
+// Enganche automático para que se actualice al iniciar sesión o comenzar turno aunque no se edite la Sección 21
+if (typeof window.actualizarVisibilidadBotonesInfoQF === "function" && !window._wrapVisibilidadCatalogo) {
+    window._wrapVisibilidadCatalogo = true;
+    const _origVisQF = window.actualizarVisibilidadBotonesInfoQF;
+    window.actualizarVisibilidadBotonesInfoQF = function () {
+        _origVisQF();
+        window.iniciarBotonCatalogoMedicamentos();
+    };
+}
 
 window.abrirModalGestionCatalogoMeds = function () {
     if (!window.tienePermisoGestionCatalogo()) {
