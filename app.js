@@ -9630,3 +9630,329 @@ window.ejecutarTourRapidoClasico = function () {
 window.iniciarTutorialFarmaPerfil = function () {
     window.abrirSelectorGuiaInteractiva();
 };
+
+// ============================================================================
+// 26. RADAR DE PACIENTES DUPLICADOS Y TRASLADO AUTOMÁTICO (CAMAS + TRÁNSITO)
+// ============================================================================
+window._cacheRadarDuplicados = { timestamp: 0, camas: [], transito: [] };
+window._duplicadosIgnoradosSesion = new Set();
+window._verificacionDuplicadoEnCurso = false;
+
+window.obtenerIndiceHospitalRadar = async function (forzarRecarga = false) {
+    const ahora = Date.now();
+    // Caché breve de 30s para no saturar lecturas de Firestore al pasar de un campo a otro
+    if (!forzarRecarga && (ahora - window._cacheRadarDuplicados.timestamp) < 30000 && window._cacheRadarDuplicados.timestamp > 0) {
+        return window._cacheRadarDuplicados;
+    }
+
+    const [snapCamas, snapTransito] = await Promise.all([
+        getDocs(collection(window.db, "camas_activas")),
+        getDocs(collection(window.db, "pacientes_transito"))
+    ]);
+
+    const camas = [];
+    snapCamas.forEach(docSnap => {
+        const d = docSnap.data();
+        if (d && (d.nombre || d.ficha || d.rut_Vault || d.rut)) {
+            camas.push({
+                origenTipo: "CAMA",
+                docId: docSnap.id,
+                datos: d,
+                rutPlano: d.rut_Vault ? window.descifrarDatoSensible(d.rut_Vault) : (d.rut || "")
+            });
+        }
+    });
+
+    const transito = [];
+    snapTransito.forEach(docSnap => {
+        const d = docSnap.data();
+        if (d && (d.nombre || d.ficha || d.rut_Vault || d.rut)) {
+            transito.push({
+                origenTipo: "TRANSITO",
+                docId: docSnap.id,
+                datos: d,
+                rutPlano: d.rut_Vault ? window.descifrarDatoSensible(d.rut_Vault) : (d.rut || "")
+            });
+        }
+    });
+
+    window._cacheRadarDuplicados = { timestamp: ahora, camas, transito };
+    return window._cacheRadarDuplicados;
+};
+
+window.buscarCoincidenciaPacienteHospital = async function (campoDisparador) {
+    if (window.isCargandoPerfil || window.isModoHistorico || window._verificacionDuplicadoEnCurso) return;
+
+    const servicioActual = (document.getElementById("servicio")?.value || "").trim();
+    const camaActual = (document.getElementById("cama")?.value || "").trim();
+    if (!servicioActual || !camaActual) return;
+
+    const idCamaActual = `${servicioActual.toLowerCase()}_${camaActual.toLowerCase()}`.replace(/\s+/g, "_");
+
+    const rutIngresado = (document.getElementById("rut")?.value || "").trim();
+    const fichaIngresada = (document.getElementById("ficha")?.value || "").trim();
+    const nombreIngresado = (document.getElementById("paciente")?.value || "").trim();
+
+    const rutLimpio = rutIngresado.replace(/[^0-9kK]/g, "").toUpperCase();
+    const hashRutBuscado = rutLimpio.length >= 7 ? window.generarHashClinico(rutIngresado) : "";
+    const fichaLimpia = fichaIngresada.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+    const nombreNorm = window.quitarTildes(nombreIngresado.toLowerCase()).replace(/\s+/g, " ").trim();
+    const tokensNombre = nombreNorm.split(" ").filter(t => t.length >= 2);
+
+    // Exigir datos mínimos suficientes para evitar falsas búsquedas
+    const tieneRutValido = rutLimpio.length >= 7;
+    const tieneFichaValida = fichaLimpia.length >= 4;
+    const tieneNombreValido = tokensNombre.length >= 2 && nombreNorm.length >= 6;
+
+    if (campoDisparador === "rut" && !tieneRutValido) return;
+    if (campoDisparador === "ficha" && !tieneFichaValida) return;
+    if (campoDisparador === "paciente" && !tieneNombreValido) return;
+    if (!tieneRutValido && !tieneFichaValida && !tieneNombreValido) return;
+
+    window._verificacionDuplicadoEnCurso = true;
+
+    try {
+        const indice = await window.obtenerIndiceHospitalRadar(false);
+        const todosRegistros = [...indice.camas, ...indice.transito];
+
+        let coincidencia = null;
+        let motivoCoincidencia = "";
+
+        for (const reg of todosRegistros) {
+            // Nunca comparar contra la propia cama donde estamos escribiendo
+            if (reg.origenTipo === "CAMA" && reg.docId === idCamaActual) continue;
+
+            const d = reg.datos;
+            const rutRegLimpio = (reg.rutPlano || "").replace(/[^0-9kK]/g, "").toUpperCase();
+            const fichaRegLimpia = String(d.ficha || "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+            const nombreRegNorm = window.quitarTildes((d.nombre || "").toLowerCase()).replace(/\s+/g, " ").trim();
+            const tokensReg = nombreRegNorm.split(" ").filter(t => t.length >= 2);
+
+            // 1. Coincidencia exacta por RUT (Prioridad máxima)
+            if (tieneRutValido && ((d.rut_Hash && d.rut_Hash === hashRutBuscado) || (rutRegLimpio && rutRegLimpio === rutLimpio))) {
+                coincidencia = reg;
+                motivoCoincidencia = "RUT";
+                break;
+            }
+
+            // 2. Coincidencia exacta por N° de Ficha
+            if (tieneFichaValida && fichaRegLimpia && fichaRegLimpia === fichaLimpia) {
+                coincidencia = reg;
+                motivoCoincidencia = "N° de Ficha";
+                break;
+            }
+
+            // 3. Coincidencia por Nombre y Apellido (bloqueada si ambos tienen RUT distintos)
+            if (tieneNombreValido && tokensReg.length >= 2) {
+                const rutsDistintos = tieneRutValido && rutRegLimpio.length >= 7 && rutRegLimpio !== rutLimpio;
+                if (!rutsDistintos) {
+                    const coincideNombreExacto = nombreRegNorm === nombreNorm;
+                    const todosTokensEnDestino = tokensNombre.every(tok => tokensReg.includes(tok));
+                    const todosTokensEnOrigen = tokensReg.every(tok => tokensNombre.includes(tok));
+
+                    if (coincideNombreExacto || todosTokensEnDestino || todosTokensEnOrigen) {
+                        coincidencia = reg;
+                        motivoCoincidencia = "Nombre y Apellido";
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (!coincidencia) return;
+
+        // Evitar repetir la alerta si el usuario ya la descartó en esta cama
+        const firmaIgnorar = `${idCamaActual}|${coincidencia.origenTipo}|${coincidencia.docId}`;
+        if (window._duplicadosIgnoradosSesion.has(firmaIgnorar)) return;
+
+        // Pausar el autoguardado mientras el operador decide
+        clearTimeout(window.temporizadorGuardado);
+        const estadoCargaPrevio = window.isCargandoPerfil;
+        window.isCargandoPerfil = true;
+
+        const d = coincidencia.datos;
+        const esTransito = coincidencia.origenTipo === "TRANSITO";
+        const ubicacionTexto = esTransito
+            ? `TRÁNSITO (Proviene de: ${d.origen || "Sin origen"})`
+            : `${(d.servicio || "").toUpperCase()} — ${d.cama || ""}`;
+        const cantMeds = Array.isArray(d.medicamentos) ? d.medicamentos.filter(m => m.farmaco).length : 0;
+
+        // Verificar si la cama destino ya tenía fármacos digitados para advertirlo
+        const medsEnCamaActual = Array.from(document.querySelectorAll('#grillaFila input[data-lista="nombres"]'))
+            .filter(i => i.value.trim() !== "").length;
+
+        const isLight = document.body.classList.contains("light-theme");
+
+        const respuesta = await Swal.fire({
+            title: esTransito ? "🚶 Paciente encontrado en Tránsito" : "🏥 Paciente ya hospitalizado",
+            icon: "warning",
+            html: `
+                <div style="text-align: left; font-size: 13.5px; line-height: 1.55;">
+                    <div style="background: ${isLight ? "#fef3c7" : "rgba(255,152,0,0.14)"}; border: 1.5px solid #ff9800; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px;">
+                        <div style="font-size: 11px; font-weight: 800; color: #d97706; text-transform: uppercase;">
+                            Coincidencia por ${motivoCoincidencia}
+                        </div>
+                        <div style="font-size: 15px; font-weight: 900; margin-top: 2px;">
+                            ${(d.nombre || "PACIENTE SIN NOMBRE").toUpperCase()}
+                        </div>
+                        <div style="font-size: 12px; opacity: 0.9; margin-top: 3px;">
+                            <b>Ubicación actual:</b> <span style="color: ${esTransito ? "#ef4444" : "#0284c7"}; font-weight: 900;">${ubicacionTexto}</span>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 12px; margin-bottom: 10px;">
+                        <div><b>RUT:</b> ${coincidencia.rutPlano || "S/R"}</div>
+                        <div><b>N° Ficha:</b> ${d.ficha || "S/F"}</div>
+                        <div style="grid-column: 1 / -1;"><b>Diagnóstico:</b> ${d.diagnostico || "No registrado"}</div>
+                        <div style="grid-column: 1 / -1;"><b>Tratamientos registrados:</b> <b>${cantMeds}</b> fármaco(s) activo(s)</div>
+                    </div>
+
+                    <div style="font-size: 13px; margin-top: 8px;">
+                        ¿Deseas ${esTransito ? "<b>rescatar</b>" : "<b>trasladar</b>"} a este paciente con <b>todo su historial de tratamientos</b> hacia <b>${servicioActual.toUpperCase()} — ${camaActual}</b>?
+                    </div>
+
+                    ${medsEnCamaActual > 0 ? `
+                        <div style="margin-top: 8px; font-size: 11.5px; color: #ef4444; font-weight: 700;">
+                            ⚠️ Nota: Esta cama ya tiene ${medsEnCamaActual} medicamento(s) digitado(s); al trasladar se cargará el historial que traía el paciente.
+                        </div>
+                    ` : ""}
+                </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: esTransito ? "✅ SÍ, RESCATAR CON HISTORIAL" : "✅ SÍ, TRASLADAR CON HISTORIAL",
+            cancelButtonText: "Ignorar (es otro paciente)",
+            confirmButtonColor: "#00c853",
+            cancelButtonColor: "#64748b",
+            background: isLight ? "#ffffff" : "#16262e",
+            color: isLight ? "#0f172a" : "#ffffff",
+            width: 540,
+            allowOutsideClick: false
+        });
+
+        if (respuesta.isConfirmed) {
+            await window.ejecutarTrasladoDesdeDetector(coincidencia, servicioActual, camaActual, idCamaActual);
+        } else {
+            window._duplicadosIgnoradosSesion.add(firmaIgnorar);
+            window.isCargandoPerfil = estadoCargaPrevio;
+            window.programarAutoguardado();
+        }
+    } catch (err) {
+        console.error("Error en radar de pacientes duplicados:", err);
+        window.isCargandoPerfil = false;
+    } finally {
+        window._verificacionDuplicadoEnCurso = false;
+    }
+};
+
+window.ejecutarTrasladoDesdeDetector = async function (coincidencia, servicioDestino, camaDestino, idCamaDestino) {
+    try {
+        clearTimeout(window.temporizadorGuardado);
+        window.isCargandoPerfil = true;
+
+        const coleccionOrigen = coincidencia.origenTipo === "TRANSITO" ? "pacientes_transito" : "camas_activas";
+        const refOrigen = doc(window.db, coleccionOrigen, coincidencia.docId);
+        const refDestino = doc(window.db, "camas_activas", idCamaDestino);
+
+        // Descargar copia fresca para no perder ningún cambio reciente en la cama de origen
+        const snapOrigen = await getDoc(refOrigen);
+        if (!snapOrigen.exists()) {
+            window.isCargandoPerfil = false;
+            alert("⚠️ El paciente ya fue movido por otro usuario. Recargando estado...");
+            window._cacheRadarDuplicados.timestamp = 0;
+            return;
+        }
+
+        const datosTraslado = { ...snapOrigen.data() };
+
+        // Conservar RUT o Ficha si el usuario los acaba de digitar y faltaban en el origen
+        const rutEscrito = (document.getElementById("rut")?.value || "").trim();
+        const fichaEscrita = (document.getElementById("ficha")?.value || "").trim();
+        if (!datosTraslado.rut_Vault && !datosTraslado.rut && rutEscrito) {
+            datosTraslado.rut_Vault = window.cifrarDatoSensible(rutEscrito);
+            datosTraslado.rut_Hash = window.generarHashClinico(rutEscrito);
+        }
+        if (!datosTraslado.ficha && fichaEscrita) {
+            datosTraslado.ficha = fichaEscrita;
+        }
+
+        // Actualizar destino y limpiar campos exclusivos de tránsito
+        datosTraslado.servicio = servicioDestino;
+        datosTraslado.cama = camaDestino;
+        datosTraslado.ultimaModificacion = new Date().toISOString();
+        delete datosTraslado.origen;
+        delete datosTraslado.timestamp;
+        delete datosTraslado.idDocTransito;
+        delete datosTraslado.rut; // Mantener cifrado rut_Vault
+
+        // 1. Escribir en la nueva cama y eliminar el registro antiguo
+        await setDoc(refDestino, JSON.parse(JSON.stringify(datosTraslado)));
+        await deleteDoc(refOrigen);
+
+        // 2. Migrar posibles solicitudes QF pendientes que apuntaban a la cama antigua
+        if (coincidencia.origenTipo === "CAMA" && Array.isArray(window.solicitudesVisacionCache)) {
+            const pendientesCamaAntigua = window.solicitudesVisacionCache.filter(s => s.idCamaDoc === coincidencia.docId);
+            for (const sol of pendientesCamaAntigua) {
+                await updateDoc(doc(window.db, "solicitudes_qf", sol.idSolicitud), {
+                    idCamaDoc: idCamaDestino,
+                    servicio: servicioDestino.toUpperCase(),
+                    cama: camaDestino
+                }).catch(() => { });
+            }
+        }
+
+        // 3. Invalidar caché y refrescar pantalla sin disparar aviso de salida
+        window._cacheRadarDuplicados.timestamp = 0;
+        window.datosSincronizados = true;
+        window.hayCambiosSinGuardar = false;
+        window.isCargandoPerfil = false;
+
+        await window.cargarTratamientoPacienteCama();
+
+        if (coincidencia.origenTipo === "TRANSITO" && typeof window.cargarSidebarTransito === "function") {
+            window.cargarSidebarTransito();
+        }
+
+        const textoOrigen = coincidencia.origenTipo === "TRANSITO"
+            ? "Tránsito"
+            : `${coincidencia.datos.servicio} - ${coincidencia.datos.cama}`;
+
+        window.mostrarToastFarmacia(
+            `<b>${(datosTraslado.nombre || "Paciente").toUpperCase()}</b> trasladado desde <b>${textoOrigen}</b> hacia <b>${servicioDestino} - ${camaDestino}</b> con todo su historial.`,
+            "✅ Traslado Automático Completado"
+        );
+    } catch (error) {
+        console.error("Error ejecutando traslado automático:", error);
+        window.isCargandoPerfil = false;
+        alert("❌ No se pudo completar el traslado automático: " + error.message);
+    }
+};
+
+// Conectar los 3 sensores de identificación del paciente al perder foco (blur)
+window.iniciarSensoresRadarDuplicados = function () {
+    if (window._radarDuplicadosActivo) return;
+    window._radarDuplicadosActivo = true;
+
+    const inpRut = document.getElementById("rut");
+    const inpFicha = document.getElementById("ficha");
+    const inpPaciente = document.getElementById("paciente");
+
+    if (inpRut) {
+        inpRut.addEventListener("blur", () => {
+            setTimeout(() => window.buscarCoincidenciaPacienteHospital("rut"), 120);
+        });
+    }
+    if (inpFicha) {
+        inpFicha.addEventListener("blur", () => {
+            setTimeout(() => window.buscarCoincidenciaPacienteHospital("ficha"), 120);
+        });
+    }
+    if (inpPaciente) {
+        inpPaciente.addEventListener("blur", () => {
+            setTimeout(() => window.buscarCoincidenciaPacienteHospital("paciente"), 120);
+        });
+    }
+};
+
+setTimeout(() => {
+    window.iniciarSensoresRadarDuplicados();
+}, 900);
