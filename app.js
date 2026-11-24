@@ -9781,55 +9781,21 @@ window.buscarCoincidenciaPacienteHospital = async function (campoDisparador) {
         const medsEnCamaActual = Array.from(document.querySelectorAll('#grillaFila input[data-lista="nombres"]'))
             .filter(i => i.value.trim() !== "").length;
 
-        const isLight = document.body.classList.contains("light-theme");
-
-        const respuesta = await Swal.fire({
-            title: esTransito ? "🚶 Paciente encontrado en Tránsito" : "🏥 Paciente ya hospitalizado",
-            icon: "warning",
-            html: `
-                <div style="text-align: left; font-size: 13.5px; line-height: 1.55;">
-                    <div style="background: ${isLight ? "#fef3c7" : "rgba(255,152,0,0.14)"}; border: 1.5px solid #ff9800; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px;">
-                        <div style="font-size: 11px; font-weight: 800; color: #d97706; text-transform: uppercase;">
-                            Coincidencia por ${motivoCoincidencia}
-                        </div>
-                        <div style="font-size: 15px; font-weight: 900; margin-top: 2px;">
-                            ${(d.nombre || "PACIENTE SIN NOMBRE").toUpperCase()}
-                        </div>
-                        <div style="font-size: 12px; opacity: 0.9; margin-top: 3px;">
-                            <b>Ubicación actual:</b> <span style="color: ${esTransito ? "#ef4444" : "#0284c7"}; font-weight: 900;">${ubicacionTexto}</span>
-                        </div>
-                    </div>
-
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 12px; margin-bottom: 10px;">
-                        <div><b>RUT:</b> ${coincidencia.rutPlano || "S/R"}</div>
-                        <div><b>N° Ficha:</b> ${d.ficha || "S/F"}</div>
-                        <div style="grid-column: 1 / -1;"><b>Diagnóstico:</b> ${d.diagnostico || "No registrado"}</div>
-                        <div style="grid-column: 1 / -1;"><b>Tratamientos registrados:</b> <b>${cantMeds}</b> fármaco(s) activo(s)</div>
-                    </div>
-
-                    <div style="font-size: 13px; margin-top: 8px;">
-                        ¿Deseas ${esTransito ? "<b>rescatar</b>" : "<b>trasladar</b>"} a este paciente con <b>todo su historial de tratamientos</b> hacia <b>${servicioActual.toUpperCase()} — ${camaActual}</b>?
-                    </div>
-
-                    ${medsEnCamaActual > 0 ? `
-                        <div style="margin-top: 8px; font-size: 11.5px; color: #ef4444; font-weight: 700;">
-                            ⚠️ Nota: Esta cama ya tiene ${medsEnCamaActual} medicamento(s) digitado(s); al trasladar se cargará el historial que traía el paciente.
-                        </div>
-                    ` : ""}
-                </div>
-            `,
-            showCancelButton: true,
-            confirmButtonText: esTransito ? "✅ SÍ, RESCATAR CON HISTORIAL" : "✅ SÍ, TRASLADAR CON HISTORIAL",
-            cancelButtonText: "Ignorar (es otro paciente)",
-            confirmButtonColor: "#00c853",
-            cancelButtonColor: "#64748b",
-            background: isLight ? "#ffffff" : "#16262e",
-            color: isLight ? "#0f172a" : "#ffffff",
-            width: 540,
-            allowOutsideClick: false
+        const confirmado = await window.mostrarModalPacienteDuplicado({
+            esTransito,
+            motivoCoincidencia,
+            nombre: (d.nombre || "PACIENTE SIN NOMBRE").toUpperCase(),
+            ubicacionTexto,
+            rutPlano: coincidencia.rutPlano || "S/R",
+            ficha: d.ficha || "S/F",
+            diagnostico: d.diagnostico || "No registrado",
+            cantMeds,
+            servicioActual: servicioActual.toUpperCase(),
+            camaActual,
+            medsEnCamaActual
         });
 
-        if (respuesta.isConfirmed) {
+        if (confirmado) {
             await window.ejecutarTrasladoDesdeDetector(coincidencia, servicioActual, camaActual, idCamaActual);
         } else {
             window._duplicadosIgnoradosSesion.add(firmaIgnorar);
@@ -9956,3 +9922,147 @@ window.iniciarSensoresRadarDuplicados = function () {
 setTimeout(() => {
     window.iniciarSensoresRadarDuplicados();
 }, 900);
+
+window.mostrarModalPacienteDuplicado = function (info) {
+    return new Promise((resolve) => {
+        let modal = document.getElementById("modal-paciente-duplicado");
+        if (!modal) {
+            modal = document.createElement("div");
+            modal.id = "modal-paciente-duplicado";
+            modal.className = "modal-overlay";
+            modal.style.cssText = "z-index: 999999999; display: none;";
+            modal.innerHTML = `
+                <div class="modal-container dup-modal-box" style="width: 620px; max-width: 95vw; gap: 16px;">
+                    <div class="modal-header" style="justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-border); padding-bottom: 14px;">
+                        <div style="display: flex; align-items: center; gap: 14px;">
+                            <span id="dup-icono-header" class="material-icons-round icon" style="font-size: 38px; padding: 11px; border-radius: 50%;">swap_horiz</span>
+                            <div>
+                                <div class="badge-container" style="margin-bottom: 4px;">
+                                    <span class="badge dup-badge-radar">RADAR CLÍNICO</span>
+                                    <span id="dup-badge-motivo" class="badge dup-badge-motivo"></span>
+                                </div>
+                                <div id="dup-titulo-principal" style="font-size: 19px; font-weight: 900; color: var(--text-main); text-transform: uppercase;"></div>
+                            </div>
+                        </div>
+                        <button type="button" id="dup-btn-cerrar-x" style="background: rgba(255,82,82,0.15); color: var(--accent-red); border: none; border-radius: 50%; width: 34px; height: 34px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                            <span class="material-icons-round">close</span>
+                        </button>
+                    </div>
+
+                    <div id="dup-card-paciente" class="dup-card-paciente">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap;">
+                            <div>
+                                <div style="font-size: 10.5px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Paciente Detectado</div>
+                                <div id="dup-nombre-paciente" style="font-size: 17px; font-weight: 900; color: var(--text-main); margin-top: 2px;"></div>
+                            </div>
+                            <span id="dup-pill-ubicacion" class="dup-pill-ubicacion"></span>
+                        </div>
+
+                        <div class="dup-grid-datos">
+                            <div class="dup-dato-item">
+                                <span class="material-icons-round">badge</span>
+                                <div><small>RUT</small><b id="dup-rut"></b></div>
+                            </div>
+                            <div class="dup-dato-item">
+                                <span class="material-icons-round">folder</span>
+                                <div><small>N° Ficha</small><b id="dup-ficha"></b></div>
+                            </div>
+                            <div class="dup-dato-item" style="grid-column: 1 / -1;">
+                                <span class="material-icons-round">medical_information</span>
+                                <div><small>Diagnóstico</small><b id="dup-diagnostico"></b></div>
+                            </div>
+                            <div class="dup-dato-item" style="grid-column: 1 / -1;">
+                                <span class="material-icons-round">vaccines</span>
+                                <div><small>Historial Terapéutico</small><b id="dup-meds"></b></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="dup-pregunta-box" class="dup-pregunta-box"></div>
+                    <div id="dup-alerta-sobrescritura" class="dup-alerta-sobrescritura" style="display: none;"></div>
+
+                    <div class="modal-actions" style="margin-top: 4px; gap: 12px;">
+                        <button type="button" id="dup-btn-ignorar" class="btn-entendido" style="flex: 1;">
+                            IGNORAR (OTRO PACIENTE)
+                        </button>
+                        <button type="button" id="dup-btn-confirmar" class="btn-validar" style="flex: 1.4; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                            <span class="material-icons-round" style="font-size: 18px;">move_up</span>
+                            <span id="dup-txt-confirmar">SÍ, TRASLADAR CON HISTORIAL</span>
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        const colorAcento = info.esTransito ? "var(--accent-red)" : "#ff9800";
+        const bgIcono = info.esTransito ? "rgba(255,82,82,0.14)" : "rgba(255,152,0,0.14)";
+
+        const icono = document.getElementById("dup-icono-header");
+        icono.textContent = info.esTransito ? "transfer_within_a_station" : "local_hospital";
+        icono.style.color = colorAcento;
+        icono.style.background = bgIcono;
+
+        const badgeMotivo = document.getElementById("dup-badge-motivo");
+        badgeMotivo.textContent = `COINCIDENCIA POR ${info.motivoCoincidencia.toUpperCase()}`;
+        badgeMotivo.style.background = colorAcento;
+        badgeMotivo.style.color = info.esTransito ? "#ffffff" : "#000000";
+
+        document.getElementById("dup-titulo-principal").textContent = info.esTransito
+            ? "PACIENTE ENCONTRADO EN TRÁNSITO"
+            : "PACIENTE YA HOSPITALIZADO";
+
+        const card = document.getElementById("dup-card-paciente");
+        card.style.borderLeftColor = colorAcento;
+
+        document.getElementById("dup-nombre-paciente").textContent = info.nombre;
+
+        const pillUb = document.getElementById("dup-pill-ubicacion");
+        pillUb.textContent = info.ubicacionTexto;
+        pillUb.className = "dup-pill-ubicacion " + (info.esTransito ? "modo-transito" : "modo-cama");
+
+        document.getElementById("dup-rut").textContent = info.rutPlano;
+        document.getElementById("dup-ficha").textContent = info.ficha;
+        document.getElementById("dup-diagnostico").textContent = info.diagnostico;
+        document.getElementById("dup-meds").textContent = `${info.cantMeds} fármaco(s) registrado(s)`;
+
+        document.getElementById("dup-pregunta-box").innerHTML = `
+            ¿Deseas ${info.esTransito ? "<b>rescatar</b>" : "<b>trasladar</b>"} a este paciente con <b>todo su historial de tratamientos</b> hacia
+            <span class="dup-destino-highlight">${info.servicioActual} — ${info.camaActual}</span>?
+        `;
+
+        const alertaSob = document.getElementById("dup-alerta-sobrescritura");
+        if (info.medsEnCamaActual > 0) {
+            alertaSob.style.display = "flex";
+            alertaSob.innerHTML = `<span class="material-icons-round" style="font-size:18px;">warning</span><span>Esta cama ya tiene <b>${info.medsEnCamaActual} medicamento(s)</b> digitado(s); al trasladar se cargará el historial que traía el paciente.</span>`;
+        } else {
+            alertaSob.style.display = "none";
+        }
+
+        document.getElementById("dup-txt-confirmar").textContent = info.esTransito
+            ? "SÍ, RESCATAR CON HISTORIAL"
+            : "SÍ, TRASLADAR CON HISTORIAL";
+
+        const cerrarYResolver = (resultado) => {
+            document.removeEventListener("keydown", onEsc);
+            modal.classList.remove("show");
+            setTimeout(() => {
+                modal.style.display = "none";
+                resolve(resultado);
+            }, 220);
+        };
+
+        const onEsc = (e) => {
+            if (e.key === "Escape") cerrarYResolver(false);
+        };
+        document.addEventListener("keydown", onEsc);
+
+        document.getElementById("dup-btn-confirmar").onclick = () => cerrarYResolver(true);
+        document.getElementById("dup-btn-ignorar").onclick = () => cerrarYResolver(false);
+        document.getElementById("dup-btn-cerrar-x").onclick = () => cerrarYResolver(false);
+
+        modal.style.display = "flex";
+        void modal.offsetHeight;
+        modal.classList.add("show");
+    });
+};
